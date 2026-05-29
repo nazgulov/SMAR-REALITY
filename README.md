@@ -32,6 +32,25 @@ npm run build
 npm run start
 ```
 
+## Publikace na GitHub Pages
+
+Projekt je připravený pro GitHub Pages bez vlastní domény. Po pushi do větve
+`main` se spustí workflow `.github/workflows/deploy-pages.yml` a web se
+publikuje na:
+
+```bash
+https://nazgulov.github.io/SMAR-REALITY/
+```
+
+Lokální kontrola statického exportu pro GitHub Pages:
+
+```bash
+npm run build:pages
+```
+
+Statické soubory pro GitHub Pages se při tomto buildu vytvoří ve složce
+`pages-out`.
+
 ## Přidání nové nemovitosti do mock dat
 
 Do souboru `data/properties.js` přidejte další objekt do pole `properties`.
