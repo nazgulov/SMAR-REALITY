@@ -3,7 +3,8 @@ import BrandLogo from "@/components/BrandLogo";
 
 const navItems = [
   { href: "/", label: "Nemovitosti" },
-  { href: "/sprava-nemovitosti", label: "Jak přidávat" }
+  { href: "/sprava-nemovitosti", label: "Jak přidávat" },
+  { href: "/admin/nemovitosti", label: "Administrace" }
 ];
 
 export default function Header() {

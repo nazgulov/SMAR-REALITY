@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Database, FileCode2, LockKeyhole } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Database,
+  FileCode2,
+  LockKeyhole,
+  Plus
+} from "lucide-react";
 import SectionTitle from "@/components/SectionTitle";
 
 const exampleProperty = `{
@@ -42,6 +49,13 @@ export default function PropertyManagementPage() {
               title="Jak přidávat nemovitosti"
               description="Tato stránka popisuje aktuální práci s mock daty a doporučený směr pro budoucí administrační rozhraní se Supabase."
             />
+            <Link
+              href="/admin/nemovitosti"
+              className="focus-ring mt-6 inline-flex items-center gap-2 rounded-lg bg-brand-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-900"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Otevřít administraci
+            </Link>
           </div>
         </div>
       </section>
