@@ -6,6 +6,8 @@ import {
   Copy,
   Download,
   ImagePlus,
+  LogIn,
+  LogOut,
   Pencil,
   Plus,
   RefreshCw,
@@ -13,8 +15,20 @@ import {
   Trash2
 } from "lucide-react";
 import { propertyTypeLabels } from "@/data/properties";
+import {
+  getStorageBucketName,
+  getSupabaseBrowserClient,
+  hasSupabaseConfig
+} from "@/lib/supabase/client";
+import {
+  fromSupabaseProperty,
+  toSupabaseProperty
+} from "@/lib/property-mappers";
 
 const STORAGE_KEY = "smar-admin-properties";
+const supabaseEnabled = hasSupabaseConfig();
+const adminSelect =
+  "id,title,type,price,location,size,layout,short_description,description,image,gallery,matterport_url,features,published,created_at";
 
 const emptyForm = {
   id: "",
@@ -91,7 +105,7 @@ function slugify(value) {
 
 function splitLines(value) {
   return value
-    .split(/\n|,/)
+    .split(/\n/)
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -142,6 +156,35 @@ function readFileAsDataUrl(file) {
   });
 }
 
+async function uploadFileToStorage(file) {
+  const supabase = getSupabaseBrowserClient();
+
+  if (!supabase) {
+    return readFileAsDataUrl(file);
+  }
+
+  const extension = file.name.split(".").pop() || "jpg";
+  const safeName = slugify(file.name.replace(/\.[^.]+$/, "")) || "image";
+  const uniqueId =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const path = `properties/${uniqueId}-${safeName}.${extension}`;
+  const bucket = getStorageBucketName();
+  const { error } = await supabase.storage.from(bucket).upload(path, file, {
+    cacheControl: "3600",
+    contentType: file.type,
+    upsert: false
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 function Field({ label, children, required = false }) {
   return (
     <label className="block">
@@ -166,6 +209,11 @@ export default function AdminPropertyForm() {
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
+  const [session, setSession] = useState(null);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const previewProperty = useMemo(() => formToProperty(form), [form]);
   const exportJson = useMemo(
@@ -174,7 +222,47 @@ export default function AdminPropertyForm() {
   );
 
   useEffect(() => {
-    setSavedProperties(readStoredProperties());
+    const supabase = getSupabaseBrowserClient();
+
+    if (!supabase) {
+      setSavedProperties(readStoredProperties());
+      return undefined;
+    }
+
+    async function loadAdminState() {
+      setIsLoading(true);
+
+      const [{ data: sessionData }, { data, error }] = await Promise.all([
+        supabase.auth.getSession(),
+        supabase
+          .from("properties")
+          .select(adminSelect)
+          .order("created_at", { ascending: false })
+      ]);
+
+      setSession(sessionData.session);
+
+      if (error) {
+        setSavedProperties(readStoredProperties());
+        setMessage(
+          "Supabase data se nepodařilo načíst. Dočasně zobrazuji lokální položky."
+        );
+      } else {
+        setSavedProperties(data.map(fromSupabaseProperty));
+      }
+
+      setIsLoading(false);
+    }
+
+    loadAdminState();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, nextSession) => {
+        setSession(nextSession);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -197,9 +285,47 @@ export default function AdminPropertyForm() {
     }));
   }
 
-  function persist(nextProperties) {
+  function persistLocal(nextProperties) {
     setSavedProperties(nextProperties);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProperties));
+  }
+
+  async function handleLogin(event) {
+    event.preventDefault();
+
+    const supabase = getSupabaseBrowserClient();
+
+    if (!supabase) {
+      setMessage("Nejdřív doplňte Supabase údaje do .env.local.");
+      return;
+    }
+
+    setIsSaving(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: authEmail,
+      password: authPassword
+    });
+    setIsSaving(false);
+
+    if (error) {
+      setMessage(`Přihlášení se nepovedlo: ${error.message}`);
+      return;
+    }
+
+    setAuthPassword("");
+    setMessage("Správce je přihlášený.");
+  }
+
+  async function handleSignOut() {
+    const supabase = getSupabaseBrowserClient();
+
+    if (!supabase) {
+      return;
+    }
+
+    await supabase.auth.signOut();
+    setSession(null);
+    setMessage("Správce je odhlášený.");
   }
 
   async function handleMainImageUpload(event) {
@@ -210,11 +336,20 @@ export default function AdminPropertyForm() {
     }
 
     try {
-      const imageUrl = await readFileAsDataUrl(file);
+      const imageUrl =
+        supabaseEnabled && session
+          ? await uploadFileToStorage(file)
+          : await readFileAsDataUrl(file);
       updateField("image", imageUrl);
-      setMessage("Hlavní obrázek byl načtený z počítače.");
+      setMessage(
+        supabaseEnabled && session
+          ? "Hlavní obrázek byl nahraný do Supabase Storage."
+          : "Hlavní obrázek byl načtený lokálně do prohlížeče."
+      );
     } catch {
       setMessage("Obrázek se nepodařilo načíst.");
+    } finally {
+      event.target.value = "";
     }
   }
 
@@ -226,16 +361,26 @@ export default function AdminPropertyForm() {
     }
 
     try {
-      const imageUrls = await Promise.all(files.map(readFileAsDataUrl));
+      const imageUrls = await Promise.all(
+        files.map((file) =>
+          supabaseEnabled && session ? uploadFileToStorage(file) : readFileAsDataUrl(file)
+        )
+      );
       const currentGallery = splitLines(form.gallery);
       updateField("gallery", [...currentGallery, ...imageUrls].join("\n"));
-      setMessage("Obrázky galerie byly načtené z počítače.");
+      setMessage(
+        supabaseEnabled && session
+          ? "Obrázky galerie byly nahrané do Supabase Storage."
+          : "Obrázky galerie byly načtené lokálně do prohlížeče."
+      );
     } catch {
       setMessage("Některý obrázek galerie se nepodařilo načíst.");
+    } finally {
+      event.target.value = "";
     }
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
     const property = formToProperty(form);
@@ -254,10 +399,47 @@ export default function AdminPropertyForm() {
       return;
     }
 
+    setIsSaving(true);
+
+    if (supabaseEnabled) {
+      const supabase = getSupabaseBrowserClient();
+
+      if (!session) {
+        setMessage("Pro uložení do Supabase se nejdřív přihlaste jako správce.");
+        setIsSaving(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("properties")
+        .upsert(toSupabaseProperty(property), { onConflict: "id" });
+
+      setIsSaving(false);
+
+      if (error) {
+        setMessage(`Uložení do Supabase se nepovedlo: ${error.message}`);
+        return;
+      }
+
+      const withoutCurrent = savedProperties.filter(
+        (item) => item.id !== (editingId ?? property.id)
+      );
+      setSavedProperties([...withoutCurrent, property]);
+      setForm(emptyForm);
+      setEditingId(null);
+      setMessage(
+        editingId
+          ? "Nemovitost byla upravena v Supabase."
+          : "Nemovitost byla uložena do Supabase."
+      );
+      return;
+    }
+
     const withoutCurrent = savedProperties.filter(
       (item) => item.id !== (editingId ?? property.id)
     );
-    persist([...withoutCurrent, property]);
+    persistLocal([...withoutCurrent, property]);
+    setIsSaving(false);
     setForm(emptyForm);
     setEditingId(null);
     setMessage(editingId ? "Nemovitost byla upravena." : "Nemovitost byla uložena.");
@@ -271,8 +453,24 @@ export default function AdminPropertyForm() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function handleDelete(id) {
-    persist(savedProperties.filter((property) => property.id !== id));
+  async function handleDelete(id) {
+    if (supabaseEnabled) {
+      const supabase = getSupabaseBrowserClient();
+
+      if (!session) {
+        setMessage("Pro mazání ze Supabase se nejdřív přihlaste jako správce.");
+        return;
+      }
+
+      const { error } = await supabase.from("properties").delete().eq("id", id);
+
+      if (error) {
+        setMessage(`Mazání se nepovedlo: ${error.message}`);
+        return;
+      }
+    }
+
+    persistLocal(savedProperties.filter((property) => property.id !== id));
 
     if (editingId === id) {
       setForm(emptyForm);
@@ -333,6 +531,62 @@ export default function AdminPropertyForm() {
             Vyčistit
           </button>
         </div>
+
+        <section className="mt-6 rounded-lg border border-zinc-200 bg-slate-50 p-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-ink">
+                {supabaseEnabled ? "Supabase režim" : "Lokální prototyp"}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-zinc-600">
+                {supabaseEnabled
+                  ? session
+                    ? `Přihlášeno jako ${session.user.email}. Nemovitosti se ukládají do databáze.`
+                    : "Supabase je nastavený. Pro ukládání a upload obrázků se přihlaste jako správce."
+                  : "Doplňte .env.local pro ukládání do Supabase. Teď se používá localStorage a JSON export."}
+              </p>
+            </div>
+
+            {supabaseEnabled ? (
+              session ? (
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100"
+                >
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  Odhlásit
+                </button>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-[180px_180px_auto]">
+                  <input
+                    className={inputClass}
+                    value={authEmail}
+                    onChange={(event) => setAuthEmail(event.target.value)}
+                    placeholder="admin@email.cz"
+                    type="email"
+                  />
+                  <input
+                    className={inputClass}
+                    value={authPassword}
+                    onChange={(event) => setAuthPassword(event.target.value)}
+                    placeholder="Heslo"
+                    type="password"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLogin}
+                    disabled={isSaving}
+                    className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <LogIn className="h-4 w-4" aria-hidden="true" />
+                    Přihlásit
+                  </button>
+                </div>
+              )
+            ) : null}
+          </div>
+        </section>
 
         <div className="mt-6 grid gap-5 md:grid-cols-2">
           <Field label="Název" required>
@@ -509,6 +763,7 @@ export default function AdminPropertyForm() {
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <button
             type="submit"
+            disabled={isSaving}
             className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-brand-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-900"
           >
             {editingId ? (
@@ -516,7 +771,11 @@ export default function AdminPropertyForm() {
             ) : (
               <Plus className="h-4 w-4" aria-hidden="true" />
             )}
-            {editingId ? "Uložit změny" : "Přidat nemovitost"}
+            {isSaving
+              ? "Ukládám..."
+              : editingId
+                ? "Uložit změny"
+                : "Přidat nemovitost"}
           </button>
           <button
             type="button"
@@ -580,7 +839,7 @@ export default function AdminPropertyForm() {
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-xl font-semibold text-ink">Uložené položky</h2>
             <span className="rounded-full bg-zinc-100 px-3 py-1 text-sm font-semibold text-zinc-700">
-              {savedProperties.length}
+              {isLoading ? "..." : savedProperties.length}
             </span>
           </div>
 

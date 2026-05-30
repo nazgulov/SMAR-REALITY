@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import PropertyDetail from "@/components/PropertyDetail";
-import { getPropertyById, properties } from "@/data/properties";
+import { getAllProperties, getPropertyById } from "@/lib/properties";
 
-export function generateStaticParams() {
+export async function generateStaticParams() {
+  const properties = await getAllProperties();
+
   return properties.map((property) => ({
     id: property.id
   }));
@@ -10,7 +12,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
-  const property = getPropertyById(id);
+  const property = await getPropertyById(id);
 
   if (!property) {
     return {
@@ -26,7 +28,7 @@ export async function generateMetadata({ params }) {
 
 export default async function PropertyPage({ params }) {
   const { id } = await params;
-  const property = getPropertyById(id);
+  const property = await getPropertyById(id);
 
   if (!property) {
     notFound();

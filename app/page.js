@@ -2,11 +2,12 @@ import Link from "next/link";
 import { ArrowDown, Building2, KeyRound } from "lucide-react";
 import PropertyGrid from "@/components/PropertyGrid";
 import SectionTitle from "@/components/SectionTitle";
-import { getPropertiesByType, properties } from "@/data/properties";
+import { getAllProperties, getPropertiesByType } from "@/lib/properties";
 
-export default function HomePage() {
-  const saleProperties = getPropertiesByType("prodej");
-  const rentalProperties = getPropertiesByType("pronajem");
+export default async function HomePage() {
+  const properties = await getAllProperties();
+  const saleProperties = getPropertiesByType(properties, "prodej");
+  const rentalProperties = getPropertiesByType(properties, "pronajem");
 
   return (
     <div className="bg-slate-50">
