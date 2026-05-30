@@ -22,8 +22,8 @@ const emptyForm = {
   type: "prodej",
   price: "",
   location: "",
-  size: "",
-  layout: "",
+  size: "50 m²",
+  layout: "1+kk, byt",
   shortDescription: "",
   description: "",
   image: "",
@@ -34,6 +34,50 @@ const emptyForm = {
 
 const sampleImage =
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80";
+
+const sizeOptions = [
+  "25 m²",
+  "30 m²",
+  "35 m²",
+  "40 m²",
+  "45 m²",
+  "50 m²",
+  "55 m²",
+  "58 m²",
+  "60 m²",
+  "64 m²",
+  "65 m²",
+  "70 m²",
+  "75 m²",
+  "80 m²",
+  "86 m²",
+  "90 m²",
+  "100 m²",
+  "112 m²",
+  "120 m²",
+  "124 m²",
+  "150 m²",
+  "180 m²",
+  "182 m²",
+  "200 m²"
+];
+
+const layoutOptions = [
+  "1+kk, byt",
+  "1+1, byt",
+  "2+kk, byt",
+  "2+1, byt",
+  "3+kk, byt",
+  "3+1, byt",
+  "4+kk, byt",
+  "4+1, byt",
+  "5+kk, rodinný dům",
+  "5+1, rodinný dům",
+  "rodinný dům",
+  "rekreační objekt",
+  "kanceláře, komerční prostor",
+  "ateliér"
+];
 
 function slugify(value) {
   return value
@@ -87,6 +131,15 @@ function readStoredProperties() {
   } catch {
     return [];
   }
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 function Field({ label, children, required = false }) {
@@ -147,6 +200,39 @@ export default function AdminPropertyForm() {
   function persist(nextProperties) {
     setSavedProperties(nextProperties);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProperties));
+  }
+
+  async function handleMainImageUpload(event) {
+    const [file] = Array.from(event.target.files ?? []);
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const imageUrl = await readFileAsDataUrl(file);
+      updateField("image", imageUrl);
+      setMessage("Hlavní obrázek byl načtený z počítače.");
+    } catch {
+      setMessage("Obrázek se nepodařilo načíst.");
+    }
+  }
+
+  async function handleGalleryUpload(event) {
+    const files = Array.from(event.target.files ?? []);
+
+    if (!files.length) {
+      return;
+    }
+
+    try {
+      const imageUrls = await Promise.all(files.map(readFileAsDataUrl));
+      const currentGallery = splitLines(form.gallery);
+      updateField("gallery", [...currentGallery, ...imageUrls].join("\n"));
+      setMessage("Obrázky galerie byly načtené z počítače.");
+    } catch {
+      setMessage("Některý obrázek galerie se nepodařilo načíst.");
+    }
   }
 
   function handleSubmit(event) {
@@ -297,31 +383,55 @@ export default function AdminPropertyForm() {
           </Field>
 
           <Field label="Velikost" required>
-            <input
+            <select
               className={inputClass}
               value={form.size}
               onChange={(event) => updateField("size", event.target.value)}
-              placeholder="82 m²"
-            />
+            >
+              {sizeOptions.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
           </Field>
 
           <Field label="Dispozice / typ" required>
-            <input
+            <select
               className={inputClass}
               value={form.layout}
               onChange={(event) => updateField("layout", event.target.value)}
-              placeholder="3+kk, byt"
-            />
+            >
+              {layoutOptions.map((layout) => (
+                <option key={layout} value={layout}>
+                  {layout}
+                </option>
+              ))}
+            </select>
           </Field>
 
-          <Field label="Hlavní obrázek">
-            <input
-              className={inputClass}
-              value={form.image}
-              onChange={(event) => updateField("image", event.target.value)}
-              placeholder="https://images.unsplash.com/..."
-            />
-          </Field>
+          <div className="md:col-span-2">
+            <Field label="Hlavní obrázek">
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
+                <input
+                  className={inputClass}
+                  value={form.image}
+                  onChange={(event) => updateField("image", event.target.value)}
+                  placeholder="https://images.unsplash.com/... nebo data:image/..."
+                />
+                <label className="focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100">
+                  <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                  Nahrát z PC
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleMainImageUpload}
+                    className="sr-only"
+                  />
+                </label>
+              </div>
+            </Field>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-5">
@@ -346,12 +456,27 @@ export default function AdminPropertyForm() {
           </Field>
 
           <Field label="Galerie obrázků">
-            <textarea
-              className={textareaClass}
-              value={form.gallery}
-              onChange={(event) => updateField("gallery", event.target.value)}
-              placeholder={"https://images.unsplash.com/...\nhttps://images.unsplash.com/..."}
-            />
+            <div className="space-y-3">
+              <textarea
+                className={textareaClass}
+                value={form.gallery}
+                onChange={(event) => updateField("gallery", event.target.value)}
+                placeholder={
+                  "https://images.unsplash.com/...\nhttps://images.unsplash.com/..."
+                }
+              />
+              <label className="focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100">
+                <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                Nahrát obrázky z PC
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleGalleryUpload}
+                  className="sr-only"
+                />
+              </label>
+            </div>
           </Field>
 
           <Field label="Matterport URL">

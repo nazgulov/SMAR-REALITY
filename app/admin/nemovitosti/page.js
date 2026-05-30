@@ -32,7 +32,8 @@ export default function AdminPropertiesPage() {
               <p className="mt-4 max-w-3xl text-base leading-7 text-zinc-600">
                 Formulář zatím ukládá položky lokálně v prohlížeči. Struktura
                 dat odpovídá souboru data/properties.js a je připravená pro
-                pozdější napojení na Supabase.
+                pozdější napojení na Supabase. Obrázky lze v prototypu nahrát
+                z počítače a exportovat společně s daty.
               </p>
             </div>
 
