@@ -25,11 +25,14 @@ import {
   fromSupabaseProperty,
   toSupabaseProperty
 } from "@/lib/property-mappers";
+import { normalizeMapInput } from "@/lib/map-utils";
 
 const STORAGE_KEY = "smar-admin-properties";
 const supabaseConfigIssue = getSupabaseConfigIssue();
 const supabaseEnabled = hasSupabaseConfig();
 const adminSelect =
+  "id,title,type,price,location,size,layout,short_description,description,image,gallery,matterport_url,map_url,features,published,created_at";
+const adminSelectWithoutMap =
   "id,title,type,price,location,size,layout,short_description,description,image,gallery,matterport_url,features,published,created_at";
 
 const emptyForm = {
@@ -45,6 +48,7 @@ const emptyForm = {
   image: "",
   gallery: "",
   matterportUrl: "",
+  mapUrl: "",
   features: ""
 };
 
@@ -116,6 +120,7 @@ function propertyToForm(property) {
   return {
     ...property,
     gallery: property.gallery.join("\n"),
+    mapUrl: property.mapUrl ?? "",
     features: property.features.join("\n")
   };
 }
@@ -136,6 +141,7 @@ function formToProperty(form) {
     image,
     gallery: splitLines(form.gallery).length ? splitLines(form.gallery) : [image],
     matterportUrl: form.matterportUrl.trim(),
+    mapUrl: normalizeMapInput(form.mapUrl),
     features: splitLines(form.features)
   };
 }
@@ -166,6 +172,10 @@ function getFriendlyErrorMessage(error) {
   }
 
   return message;
+}
+
+function isMissingMapColumn(error) {
+  return error?.message?.includes("map_url");
 }
 
 async function uploadFileToStorage(file) {
@@ -245,13 +255,24 @@ export default function AdminPropertyForm() {
       setIsLoading(true);
 
       try {
-        const [{ data: sessionData }, { data, error }] = await Promise.all([
+        const [{ data: sessionData }, propertiesResponse] = await Promise.all([
           supabase.auth.getSession(),
           supabase
             .from("properties")
             .select(adminSelect)
             .order("created_at", { ascending: false })
         ]);
+        let { data, error } = propertiesResponse;
+
+        if (isMissingMapColumn(error)) {
+          const fallbackResponse = await supabase
+            .from("properties")
+            .select(adminSelectWithoutMap)
+            .order("created_at", { ascending: false });
+
+          data = fallbackResponse.data;
+          error = fallbackResponse.error;
+        }
 
         setSession(sessionData.session);
 
@@ -658,6 +679,17 @@ export default function AdminPropertyForm() {
               value={form.location}
               onChange={(event) => updateField("location", event.target.value)}
               placeholder="Praha 5 - Smíchov"
+            />
+          </Field>
+
+          <Field label="Mapa / adresa">
+            <textarea
+              className="focus-ring min-h-24 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm leading-6 text-ink shadow-sm transition placeholder:text-zinc-400"
+              value={form.mapUrl}
+              onChange={(event) => updateField("mapUrl", event.target.value)}
+              placeholder={
+                "https://mapy.com/s/kukusukere\nnebo <iframe src=\"https://mapy.com/s/cunacamopo\"></iframe>\nnebo Praha 5, Ulice 12"
+              }
             />
           </Field>
 

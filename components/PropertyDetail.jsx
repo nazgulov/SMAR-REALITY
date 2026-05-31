@@ -10,6 +10,7 @@ import {
   Tag
 } from "lucide-react";
 import MatterportEmbed from "@/components/MatterportEmbed";
+import MapEmbed from "@/components/MapEmbed";
 import { propertyTypeLabels } from "@/data/properties";
 
 const badgeStyles = {
@@ -111,6 +112,12 @@ export default function PropertyDetail({ property }) {
               ))}
             </div>
           </section>
+
+          <MapEmbed
+            mapUrl={property.mapUrl}
+            location={property.location}
+            title={property.title}
+          />
 
           <MatterportEmbed url={property.matterportUrl} title={property.title} />
         </div>
