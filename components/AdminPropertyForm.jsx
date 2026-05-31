@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { propertyTypeLabels } from "@/data/properties";
 import {
+  getSupabaseConfigIssue,
   getStorageBucketName,
   getSupabaseBrowserClient,
   hasSupabaseConfig
@@ -26,6 +27,7 @@ import {
 } from "@/lib/property-mappers";
 
 const STORAGE_KEY = "smar-admin-properties";
+const supabaseConfigIssue = getSupabaseConfigIssue();
 const supabaseEnabled = hasSupabaseConfig();
 const adminSelect =
   "id,title,type,price,location,size,layout,short_description,description,image,gallery,matterport_url,features,published,created_at";
@@ -156,6 +158,16 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function getFriendlyErrorMessage(error) {
+  const message = error?.message ?? String(error);
+
+  if (message === "Load failed" || message === "Failed to fetch") {
+    return "Nepodařilo se připojit k Supabase. Zkontrolujte URL a anon key v .env.local a po změně restartujte server.";
+  }
+
+  return message;
+}
+
 async function uploadFileToStorage(file) {
   const supabase = getSupabaseBrowserClient();
 
@@ -232,23 +244,28 @@ export default function AdminPropertyForm() {
     async function loadAdminState() {
       setIsLoading(true);
 
-      const [{ data: sessionData }, { data, error }] = await Promise.all([
-        supabase.auth.getSession(),
-        supabase
-          .from("properties")
-          .select(adminSelect)
-          .order("created_at", { ascending: false })
-      ]);
+      try {
+        const [{ data: sessionData }, { data, error }] = await Promise.all([
+          supabase.auth.getSession(),
+          supabase
+            .from("properties")
+            .select(adminSelect)
+            .order("created_at", { ascending: false })
+        ]);
 
-      setSession(sessionData.session);
+        setSession(sessionData.session);
 
-      if (error) {
+        if (error) {
+          setSavedProperties(readStoredProperties());
+          setMessage(
+            "Supabase data se nepodařilo načíst. Dočasně zobrazuji lokální položky."
+          );
+        } else {
+          setSavedProperties(data.map(fromSupabaseProperty));
+        }
+      } catch (error) {
         setSavedProperties(readStoredProperties());
-        setMessage(
-          "Supabase data se nepodařilo načíst. Dočasně zobrazuji lokální položky."
-        );
-      } else {
-        setSavedProperties(data.map(fromSupabaseProperty));
+        setMessage(`Supabase data se nepodařilo načíst: ${getFriendlyErrorMessage(error)}`);
       }
 
       setIsLoading(false);
@@ -301,19 +318,25 @@ export default function AdminPropertyForm() {
     }
 
     setIsSaving(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: authEmail,
-      password: authPassword
-    });
-    setIsSaving(false);
 
-    if (error) {
-      setMessage(`Přihlášení se nepovedlo: ${error.message}`);
-      return;
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: authEmail,
+        password: authPassword
+      });
+
+      if (error) {
+        setMessage(`Přihlášení se nepovedlo: ${error.message}`);
+        return;
+      }
+
+      setAuthPassword("");
+      setMessage("Správce je přihlášený.");
+    } catch (error) {
+      setMessage(`Přihlášení se nepovedlo: ${getFriendlyErrorMessage(error)}`);
+    } finally {
+      setIsSaving(false);
     }
-
-    setAuthPassword("");
-    setMessage("Správce je přihlášený.");
   }
 
   async function handleSignOut() {
@@ -543,7 +566,9 @@ export default function AdminPropertyForm() {
                   ? session
                     ? `Přihlášeno jako ${session.user.email}. Nemovitosti se ukládají do databáze.`
                     : "Supabase je nastavený. Pro ukládání a upload obrázků se přihlaste jako správce."
-                  : "Doplňte .env.local pro ukládání do Supabase. Teď se používá localStorage a JSON export."}
+                  : supabaseConfigIssue
+                    ? `${supabaseConfigIssue} Teď se používá localStorage a JSON export.`
+                    : "Doplňte .env.local pro ukládání do Supabase. Teď se používá localStorage a JSON export."}
               </p>
             </div>
 
