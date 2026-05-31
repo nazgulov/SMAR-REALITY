@@ -115,7 +115,10 @@ Povinná struktura:
 ```
 
 Pokud `matterportUrl` zůstane prázdné, detail zobrazí placeholder iframe s instrukcí, kam později Matterport URL doplnit.
-Pokud `mapUrl` zůstane prázdné, detail použije vyhledání podle pole `location`. V administraci lze vložit Mapy.com odkaz, celý iframe z Mapy.com nebo přesnou adresu.
+Pro vloženou interaktivní mapu je nejlepší použít iframe z Mapy.com funkce
+`Sdílet -> Vložit mapu do vlastních stránek`, typicky se zdrojem
+`https://frame.mapy.cz/s/...`. Sdílený odkaz `https://mapy.com/s/...` aplikace
+převede na iframe automaticky. Přesná adresa slouží jako odkaz na Mapy.com.
 
 ## Doporučený další vývoj
 

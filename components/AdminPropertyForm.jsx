@@ -688,7 +688,7 @@ export default function AdminPropertyForm() {
               value={form.mapUrl}
               onChange={(event) => updateField("mapUrl", event.target.value)}
               placeholder={
-                "https://mapy.com/s/kukusukere\nnebo <iframe src=\"https://mapy.com/s/cunacamopo\"></iframe>\nnebo Praha 5, Ulice 12"
+                "Nejlepší je iframe z Mapy.com: <iframe src=\"https://frame.mapy.cz/s/...\">\nnebo sdílený odkaz https://mapy.com/s/...\nnebo přesná adresa jako odkaz"
               }
             />
           </Field>
