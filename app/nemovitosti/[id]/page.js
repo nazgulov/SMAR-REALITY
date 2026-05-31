@@ -3,6 +3,10 @@ import PropertyDetail from "@/components/PropertyDetail";
 import { getAllProperties, getPropertyById } from "@/lib/properties";
 
 export async function generateStaticParams() {
+  if (process.env.GITHUB_PAGES !== "true") {
+    return [];
+  }
+
   const properties = await getAllProperties();
 
   return properties.map((property) => ({
