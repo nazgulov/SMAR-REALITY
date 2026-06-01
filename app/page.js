@@ -62,7 +62,7 @@ export default async function HomePage() {
               <p className="text-2xl font-semibold text-ink">
                 {properties.length}
               </p>
-              <p className="text-sm text-zinc-500">Ukázkových nemovitostí</p>
+              <p className="text-sm text-zinc-500">Aktuálních nemovitostí</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -94,7 +94,7 @@ export default async function HomePage() {
         <SectionTitle
           eyebrow="Přehled"
           title="Vybrané nemovitosti"
-          description="Nabídky jsou zatím uložené v lokálním souboru mock dat. Struktura je připravená tak, aby šla později nahradit API nebo databází."
+          description="Aktuální nabídka nemovitostí k prodeji a pronájmu v přehledném zobrazení."
         />
 
         <div className="mt-10 space-y-14">

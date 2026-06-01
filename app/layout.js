@@ -5,7 +5,7 @@ import Footer from "@/components/Footer";
 export const metadata = {
   title: "SMAR s.r.o. | Reality",
   description:
-    "Moderní wireframe realitního webu SMAR s.r.o. s nabídkami k prodeji a pronájmu."
+    "Moderní realitní web SMAR s.r.o. s nabídkami k prodeji a pronájmu."
 };
 
 export default function RootLayout({ children }) {

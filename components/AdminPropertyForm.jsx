@@ -44,7 +44,7 @@ const emptyForm = {
   location: "",
   size: "50 m²",
   plotArea: "",
-  usableArea: "50 m²",
+  usableArea: "50",
   builtUpArea: "",
   layout: "1+kk, byt",
   shortDescription: "",
@@ -61,38 +61,38 @@ const sampleImage =
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80";
 
 const areaOptions = [
-  "25 m²",
-  "30 m²",
-  "35 m²",
-  "40 m²",
-  "45 m²",
-  "50 m²",
-  "55 m²",
-  "58 m²",
-  "60 m²",
-  "64 m²",
-  "65 m²",
-  "70 m²",
-  "75 m²",
-  "80 m²",
-  "86 m²",
-  "90 m²",
-  "100 m²",
-  "112 m²",
-  "120 m²",
-  "124 m²",
-  "150 m²",
-  "180 m²",
-  "182 m²",
-  "200 m²",
-  "250 m²",
-  "300 m²",
-  "400 m²",
-  "500 m²",
-  "620 m²",
-  "750 m²",
-  "980 m²",
-  "1 200 m²"
+  "25",
+  "30",
+  "35",
+  "40",
+  "45",
+  "50",
+  "55",
+  "58",
+  "60",
+  "64",
+  "65",
+  "70",
+  "75",
+  "80",
+  "86",
+  "90",
+  "100",
+  "112",
+  "120",
+  "124",
+  "150",
+  "180",
+  "182",
+  "200",
+  "250",
+  "300",
+  "400",
+  "500",
+  "620",
+  "750",
+  "980",
+  "1 200"
 ];
 
 const layoutOptions = [
@@ -118,12 +118,20 @@ const featureOptions = [
   "Parkovací stání",
   "Garáž",
   "Terasa",
+  "Lodžie",
   "Zahrada",
+  "Předzahrádka",
+  "Komora",
+  "Šatna",
   "Výtah",
   "Bezbariérový přístup",
   "Klimatizace",
   "Tepelné čerpadlo",
   "Fotovoltaika",
+  "Krb",
+  "Sauna",
+  "Bazén",
+  "Vlastní studna",
   "Novostavba",
   "Po rekonstrukci",
   "Vybaveno",
@@ -141,6 +149,26 @@ function slugify(value) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 72);
+}
+
+function normalizeAreaValue(value) {
+  const trimmed = value.trim().replace(/\s+/g, " ");
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const normalized = trimmed.replace(/\s*m\s*(2|²)$/i, " m²");
+
+  if (/\s*m²$/i.test(normalized)) {
+    return normalized;
+  }
+
+  return `${normalized} m²`;
+}
+
+function getAreaInputValue(value) {
+  return value.replace(/\s*m\s*(2|²)$/i, "").trim();
 }
 
 function splitLines(value) {
@@ -171,13 +199,13 @@ function propertyToForm(property) {
 
 function formToProperty(form) {
   const image = form.image.trim() || sampleImage;
-  const plotArea = form.plotArea.trim();
-  const usableArea = form.usableArea.trim();
-  const builtUpArea = form.builtUpArea.trim();
+  const plotArea = normalizeAreaValue(form.plotArea);
+  const usableArea = normalizeAreaValue(form.usableArea);
+  const builtUpArea = normalizeAreaValue(form.builtUpArea);
   const size = usableArea || plotArea || builtUpArea || form.size.trim();
 
   return {
-    id: form.id.trim() || slugify(form.title) || `nemovitost-${Date.now()}`,
+    id: slugify(form.id) || slugify(form.title) || `nemovitost-${Date.now()}`,
     title: form.title.trim(),
     type: form.type,
     price: form.price.trim(),
@@ -284,6 +312,23 @@ function Field({ label, children, required = false, asDiv = false }) {
 const inputClass =
   "focus-ring w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-ink shadow-sm transition placeholder:text-zinc-400";
 
+function AreaInput({ value, onChange, placeholder }) {
+  return (
+    <div className="relative">
+      <input
+        className={`${inputClass} pr-12`}
+        list="area-options"
+        value={getAreaInputValue(value)}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
+      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-zinc-500">
+        m²
+      </span>
+    </div>
+  );
+}
+
 const textareaClass =
   "focus-ring min-h-28 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm leading-6 text-ink shadow-sm transition placeholder:text-zinc-400";
 
@@ -291,6 +336,7 @@ export default function AdminPropertyForm() {
   const [form, setForm] = useState(emptyForm);
   const [savedProperties, setSavedProperties] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [isSlugManual, setIsSlugManual] = useState(false);
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [session, setSession] = useState(null);
@@ -366,17 +412,6 @@ export default function AdminPropertyForm() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!form.title || editingId) {
-      return;
-    }
-
-    setForm((current) => ({
-      ...current,
-      id: current.id || slugify(current.title)
-    }));
-  }, [form.title, editingId]);
-
   function updateField(field, value) {
     setCopied(false);
     setMessage("");
@@ -384,6 +419,22 @@ export default function AdminPropertyForm() {
       ...current,
       [field]: value
     }));
+  }
+
+  function handleTitleChange(value) {
+    setCopied(false);
+    setMessage("");
+    setForm((current) => ({
+      ...current,
+      title: value,
+      id: editingId || isSlugManual ? current.id : slugify(value)
+    }));
+  }
+
+  function handleSlugChange(value) {
+    const nextSlug = slugify(value);
+    setIsSlugManual(Boolean(nextSlug));
+    updateField("id", nextSlug);
   }
 
   function toggleFeature(feature) {
@@ -561,6 +612,7 @@ export default function AdminPropertyForm() {
       setSavedProperties([...withoutCurrent, property]);
       setForm(emptyForm);
       setEditingId(null);
+      setIsSlugManual(false);
       setMessage(
         editingId
           ? "Nemovitost byla upravena v Supabase."
@@ -576,12 +628,14 @@ export default function AdminPropertyForm() {
     setIsSaving(false);
     setForm(emptyForm);
     setEditingId(null);
+    setIsSlugManual(false);
     setMessage(editingId ? "Nemovitost byla upravena." : "Nemovitost byla uložena.");
   }
 
   function handleEdit(property) {
     setForm(propertyToForm(property));
     setEditingId(property.id);
+    setIsSlugManual(true);
     setMessage("");
     setCopied(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -609,6 +663,7 @@ export default function AdminPropertyForm() {
     if (editingId === id) {
       setForm(emptyForm);
       setEditingId(null);
+      setIsSlugManual(false);
     }
   }
 
@@ -663,6 +718,7 @@ export default function AdminPropertyForm() {
             onClick={() => {
               setForm(emptyForm);
               setEditingId(null);
+              setIsSlugManual(false);
               setMessage("");
             }}
             className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100"
@@ -735,7 +791,7 @@ export default function AdminPropertyForm() {
             <input
               className={inputClass}
               value={form.title}
-              onChange={(event) => updateField("title", event.target.value)}
+              onChange={(event) => handleTitleChange(event.target.value)}
               placeholder="Byt 3+kk s balkonem"
             />
           </Field>
@@ -744,7 +800,7 @@ export default function AdminPropertyForm() {
             <input
               className={inputClass}
               value={form.id}
-              onChange={(event) => updateField("id", slugify(event.target.value))}
+              onChange={(event) => handleSlugChange(event.target.value)}
               placeholder="byt-3kk-s-balkonem"
             />
           </Field>
@@ -790,32 +846,26 @@ export default function AdminPropertyForm() {
           </Field>
 
           <Field label="Plocha pozemku">
-            <input
-              className={inputClass}
-              list="area-options"
+            <AreaInput
               value={form.plotArea}
-              onChange={(event) => updateField("plotArea", event.target.value)}
-              placeholder="např. 620 m²"
+              onChange={(value) => updateField("plotArea", value)}
+              placeholder="např. 620"
             />
           </Field>
 
           <Field label="Užitná plocha">
-            <input
-              className={inputClass}
-              list="area-options"
+            <AreaInput
               value={form.usableArea}
-              onChange={(event) => updateField("usableArea", event.target.value)}
-              placeholder="např. 86 m²"
+              onChange={(value) => updateField("usableArea", value)}
+              placeholder="např. 86"
             />
           </Field>
 
           <Field label="Zastavěná plocha">
-            <input
-              className={inputClass}
-              list="area-options"
+            <AreaInput
               value={form.builtUpArea}
-              onChange={(event) => updateField("builtUpArea", event.target.value)}
-              placeholder="např. 124 m²"
+              onChange={(value) => updateField("builtUpArea", value)}
+              placeholder="např. 124"
             />
           </Field>
 

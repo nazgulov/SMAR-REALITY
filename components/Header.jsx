@@ -29,12 +29,12 @@ export default function Header() {
               {item.label}
             </Link>
           ))}
-          <a
-            href="mailto:info@smar.cz"
+          <Link
+            href="/kontakt"
             className="focus-ring rounded-lg bg-brand-700 px-4 py-2 text-white transition hover:bg-brand-900"
           >
             Kontakt
-          </a>
+          </Link>
         </nav>
       </div>
     </header>

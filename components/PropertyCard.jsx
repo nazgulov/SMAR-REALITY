@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Check, MapPin } from "lucide-react";
+import { ArrowRight, Check, MapPin } from "lucide-react";
 import { propertyTypeLabels } from "@/data/properties";
-import { formatPropertyDate, getAreaItems } from "@/lib/property-display";
+import { getAreaItems } from "@/lib/property-display";
 
 const badgeStyles = {
   prodej: "bg-brand-700 text-white",
@@ -12,7 +12,6 @@ const badgeStyles = {
 export default function PropertyCard({ property }) {
   const typeLabel = propertyTypeLabels[property.type] ?? property.type;
   const areaItems = getAreaItems(property);
-  const createdDate = formatPropertyDate(property.createdAt);
   const featurePreview = (property.features ?? []).slice(0, 3);
 
   return (
@@ -84,12 +83,6 @@ export default function PropertyCard({ property }) {
           <div className="mt-auto flex items-end justify-between gap-4 pt-5">
             <span className="grid gap-1 text-sm text-zinc-500">
               <span>{property.layout}</span>
-              {createdDate ? (
-                <span className="inline-flex items-center gap-1 text-xs">
-                  <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-                  Vloženo {createdDate}
-                </span>
-              ) : null}
             </span>
             <span className="inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-3 py-2 text-sm font-semibold text-ink transition group-hover:bg-brand-700 group-hover:text-white">
               Zobrazit detail

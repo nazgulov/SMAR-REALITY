@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BrandLogo from "@/components/BrandLogo";
+import { contactInfo } from "@/data/contact";
 
 export default function Footer() {
   return (
@@ -8,8 +9,8 @@ export default function Footer() {
         <div>
           <BrandLogo compact />
           <p className="mt-3 max-w-md leading-6">
-            Wireframe realitního webu připravený pro nabídky k prodeji a
-            pronájmu, virtuální prohlídky a budoucí administrační rozhraní.
+            Realitní služby pro prodej a pronájem nemovitostí s osobním
+            přístupem a přehlednou prezentací nabídky.
           </p>
         </div>
         <div>
@@ -21,15 +22,31 @@ export default function Footer() {
             <Link className="hover:text-brand-700" href="/sprava-nemovitosti">
               Jak přidávat nemovitosti
             </Link>
+            <Link className="hover:text-brand-700" href="/kontakt">
+              Kontakt
+            </Link>
           </div>
         </div>
         <div>
           <p className="font-semibold text-ink">Kontakt</p>
           <div className="mt-3 flex flex-col gap-2">
-            <a className="hover:text-brand-700" href="mailto:info@smar.cz">
-              info@smar.cz
+            <a
+              className="hover:text-brand-700"
+              href={`mailto:${contactInfo.email}`}
+            >
+              {contactInfo.email}
             </a>
-            <span>Praha, Česká republika</span>
+            <a
+              className="hover:text-brand-700"
+              href={`tel:${contactInfo.phone.replace(/\s/g, "")}`}
+            >
+              {contactInfo.phone}
+            </a>
+            <span>{contactInfo.company}</span>
+            {contactInfo.addressLines.map((line) => (
+              <span key={line}>{line}</span>
+            ))}
+            <span>Datová schránka: {contactInfo.dataBox}</span>
           </div>
         </div>
       </div>

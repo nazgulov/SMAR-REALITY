@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Building2,
+  CalendarDays,
   Check,
   Mail,
   MapPin,
@@ -12,7 +13,7 @@ import {
 import MatterportEmbed from "@/components/MatterportEmbed";
 import MapEmbed from "@/components/MapEmbed";
 import { propertyTypeLabels } from "@/data/properties";
-import { getAreaItems } from "@/lib/property-display";
+import { formatPropertyDate, getAreaItems } from "@/lib/property-display";
 
 const badgeStyles = {
   prodej: "bg-brand-700 text-white",
@@ -21,6 +22,7 @@ const badgeStyles = {
 
 export default function PropertyDetail({ property }) {
   const typeLabel = propertyTypeLabels[property.type] ?? property.type;
+  const createdDate = formatPropertyDate(property.createdAt);
   const areaStats = getAreaItems(property).map((area) => ({
     label: area.label,
     value: area.value,
@@ -31,7 +33,16 @@ export default function PropertyDetail({ property }) {
     { label: "Lokalita", value: property.location, icon: MapPin },
     ...areaStats,
     { label: "Dispozice / typ", value: property.layout, icon: Building2 },
-    { label: "Typ nabídky", value: typeLabel, icon: Tag }
+    { label: "Typ nabídky", value: typeLabel, icon: Tag },
+    ...(createdDate
+      ? [
+          {
+            label: "Vloženo na portál",
+            value: createdDate,
+            icon: CalendarDays
+          }
+        ]
+      : [])
   ];
 
   return (
@@ -152,15 +163,13 @@ export default function PropertyDetail({ property }) {
               Domluvte si prohlídku, ověřte dostupnost nebo požádejte o další
               informace k této nemovitosti.
             </p>
-            <a
-              href={`mailto:info@smar.cz?subject=${encodeURIComponent(
-                `Dotaz na nemovitost: ${property.title}`
-              )}`}
+            <Link
+              href={`/kontakt?nemovitost=${property.id}`}
               className="focus-ring mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700"
             >
               <Mail className="h-4 w-4" aria-hidden="true" />
               Kontaktovat nás
-            </a>
+            </Link>
           </section>
         </aside>
       </section>
