@@ -43,6 +43,8 @@ začne ukládat do databáze.
 
 1. V Supabase vytvořte nový projekt.
 2. V SQL editoru spusťte obsah souboru `supabase/schema.sql`.
+   Pro existující projekt po starším nasazení spusťte také migrace
+   `supabase/add-property-map-url.sql` a `supabase/add-property-area-fields.sql`.
 3. V Authentication vytvořte admin uživatele přes email a heslo.
 4. Zkopírujte `.env.example` do `.env.local` a doplňte hodnoty:
 
@@ -100,7 +102,11 @@ Povinná struktura:
   price: "8 900 000 Kč",
   location: "Praha",
   size: "61 m²",
+  plotArea: "",
+  usableArea: "61 m²",
+  builtUpArea: "",
   layout: "2+kk, byt",
+  createdAt: "2026-06-01T10:00:00.000Z",
   shortDescription: "Krátký popis pro kartu.",
   description: "Delší popis pro detail.",
   image: "https://images.unsplash.com/...",

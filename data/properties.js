@@ -6,7 +6,11 @@ export const properties = [
     price: "14 900 000 Kč",
     location: "Říčany u Prahy",
     size: "182 m²",
+    plotArea: "620 m²",
+    usableArea: "182 m²",
+    builtUpArea: "124 m²",
     layout: "5+kk, rodinný dům",
+    createdAt: "2026-05-01T10:00:00.000Z",
     shortDescription:
       "Světlý rodinný dům v klidné rezidenční části s velkou zahradou a garáží.",
     description:
@@ -34,7 +38,11 @@ export const properties = [
     price: "11 750 000 Kč",
     location: "Praha 8 - Karlín",
     size: "86 m²",
+    plotArea: "",
+    usableArea: "86 m²",
+    builtUpArea: "",
     layout: "3+kk, byt",
+    createdAt: "2026-05-06T10:00:00.000Z",
     shortDescription:
       "Elegantní byt s balkonem v oblíbené lokalitě poblíž metra a služeb.",
     description:
@@ -62,7 +70,11 @@ export const properties = [
     price: "6 450 000 Kč",
     location: "Týnec nad Sázavou",
     size: "124 m²",
+    plotArea: "980 m²",
+    usableArea: "124 m²",
+    builtUpArea: "96 m²",
     layout: "4+1, rekreační objekt",
+    createdAt: "2026-05-10T10:00:00.000Z",
     shortDescription:
       "Stylová chalupa s atmosférou, moderním zázemím a výhledem do přírody.",
     description:
@@ -90,7 +102,11 @@ export const properties = [
     price: "28 000 Kč / měsíc",
     location: "Praha 2 - Vinohrady",
     size: "58 m²",
+    plotArea: "",
+    usableArea: "58 m²",
+    builtUpArea: "",
     layout: "2+kk, byt",
+    createdAt: "2026-05-14T10:00:00.000Z",
     shortDescription:
       "Kompletně vybavený byt ve vyhledávané části Vinohrad u parků a metra.",
     description:
@@ -118,7 +134,11 @@ export const properties = [
     price: "39 000 Kč / měsíc",
     location: "Brno - střed",
     size: "112 m²",
+    plotArea: "",
+    usableArea: "112 m²",
+    builtUpArea: "",
     layout: "kanceláře, komerční prostor",
+    createdAt: "2026-05-18T10:00:00.000Z",
     shortDescription:
       "Reprezentativní kanceláře s recepcí, zasedací místností a skvělou dostupností.",
     description:
@@ -146,7 +166,11 @@ export const properties = [
     price: "24 500 Kč / měsíc",
     location: "Praha 7 - Holešovice",
     size: "64 m²",
+    plotArea: "",
+    usableArea: "64 m²",
+    builtUpArea: "",
     layout: "1+kk, ateliér",
+    createdAt: "2026-05-22T10:00:00.000Z",
     shortDescription:
       "Designový ateliér s vysokými stropy, terasou a industriálním charakterem.",
     description:

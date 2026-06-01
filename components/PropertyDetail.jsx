@@ -12,6 +12,7 @@ import {
 import MatterportEmbed from "@/components/MatterportEmbed";
 import MapEmbed from "@/components/MapEmbed";
 import { propertyTypeLabels } from "@/data/properties";
+import { getAreaItems } from "@/lib/property-display";
 
 const badgeStyles = {
   prodej: "bg-brand-700 text-white",
@@ -20,10 +21,15 @@ const badgeStyles = {
 
 export default function PropertyDetail({ property }) {
   const typeLabel = propertyTypeLabels[property.type] ?? property.type;
+  const areaStats = getAreaItems(property).map((area) => ({
+    label: area.label,
+    value: area.value,
+    icon: Ruler
+  }));
 
   const stats = [
     { label: "Lokalita", value: property.location, icon: MapPin },
-    { label: "Velikost", value: property.size, icon: Ruler },
+    ...areaStats,
     { label: "Dispozice / typ", value: property.layout, icon: Building2 },
     { label: "Typ nabídky", value: typeLabel, icon: Tag }
   ];

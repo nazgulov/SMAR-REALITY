@@ -26,13 +26,14 @@ import {
   toSupabaseProperty
 } from "@/lib/property-mappers";
 import { normalizeMapInput } from "@/lib/map-utils";
+import { formatPropertyDate, getAreaItems } from "@/lib/property-display";
 
 const STORAGE_KEY = "smar-admin-properties";
 const supabaseConfigIssue = getSupabaseConfigIssue();
 const supabaseEnabled = hasSupabaseConfig();
 const adminSelect =
-  "id,title,type,price,location,size,layout,short_description,description,image,gallery,matterport_url,map_url,features,published,created_at";
-const adminSelectWithoutMap =
+  "id,title,type,price,location,size,plot_area,usable_area,built_up_area,layout,short_description,description,image,gallery,matterport_url,map_url,features,published,created_at";
+const adminSelectBase =
   "id,title,type,price,location,size,layout,short_description,description,image,gallery,matterport_url,features,published,created_at";
 
 const emptyForm = {
@@ -42,6 +43,9 @@ const emptyForm = {
   price: "",
   location: "",
   size: "50 m²",
+  plotArea: "",
+  usableArea: "50 m²",
+  builtUpArea: "",
   layout: "1+kk, byt",
   shortDescription: "",
   description: "",
@@ -49,13 +53,14 @@ const emptyForm = {
   gallery: "",
   matterportUrl: "",
   mapUrl: "",
-  features: ""
+  features: "",
+  createdAt: ""
 };
 
 const sampleImage =
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80";
 
-const sizeOptions = [
+const areaOptions = [
   "25 m²",
   "30 m²",
   "35 m²",
@@ -79,7 +84,15 @@ const sizeOptions = [
   "150 m²",
   "180 m²",
   "182 m²",
-  "200 m²"
+  "200 m²",
+  "250 m²",
+  "300 m²",
+  "400 m²",
+  "500 m²",
+  "620 m²",
+  "750 m²",
+  "980 m²",
+  "1 200 m²"
 ];
 
 const layoutOptions = [
@@ -99,6 +112,27 @@ const layoutOptions = [
   "ateliér"
 ];
 
+const featureOptions = [
+  "Balkon",
+  "Sklep",
+  "Parkovací stání",
+  "Garáž",
+  "Terasa",
+  "Zahrada",
+  "Výtah",
+  "Bezbariérový přístup",
+  "Klimatizace",
+  "Tepelné čerpadlo",
+  "Fotovoltaika",
+  "Novostavba",
+  "Po rekonstrukci",
+  "Vybaveno",
+  "Internet",
+  "MHD v dosahu",
+  "Klidná lokalita",
+  "K nastěhování ihned"
+];
+
 function slugify(value) {
   return value
     .toLowerCase()
@@ -116,17 +150,31 @@ function splitLines(value) {
     .filter(Boolean);
 }
 
+function uniqueItems(items) {
+  return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
+}
+
 function propertyToForm(property) {
+  const usableArea = property.usableArea || property.size || "";
+
   return {
     ...property,
+    plotArea: property.plotArea ?? "",
+    usableArea,
+    builtUpArea: property.builtUpArea ?? "",
+    size: property.size || usableArea,
     gallery: property.gallery.join("\n"),
     mapUrl: property.mapUrl ?? "",
-    features: property.features.join("\n")
+    features: uniqueItems(property.features ?? []).join("\n")
   };
 }
 
 function formToProperty(form) {
   const image = form.image.trim() || sampleImage;
+  const plotArea = form.plotArea.trim();
+  const usableArea = form.usableArea.trim();
+  const builtUpArea = form.builtUpArea.trim();
+  const size = usableArea || plotArea || builtUpArea || form.size.trim();
 
   return {
     id: form.id.trim() || slugify(form.title) || `nemovitost-${Date.now()}`,
@@ -134,7 +182,10 @@ function formToProperty(form) {
     type: form.type,
     price: form.price.trim(),
     location: form.location.trim(),
-    size: form.size.trim(),
+    size,
+    plotArea,
+    usableArea,
+    builtUpArea,
     layout: form.layout.trim(),
     shortDescription: form.shortDescription.trim(),
     description: form.description.trim(),
@@ -142,7 +193,8 @@ function formToProperty(form) {
     gallery: splitLines(form.gallery).length ? splitLines(form.gallery) : [image],
     matterportUrl: form.matterportUrl.trim(),
     mapUrl: normalizeMapInput(form.mapUrl),
-    features: splitLines(form.features)
+    features: uniqueItems(splitLines(form.features)),
+    createdAt: form.createdAt || new Date().toISOString()
   };
 }
 
@@ -178,6 +230,14 @@ function isMissingMapColumn(error) {
   return error?.message?.includes("map_url");
 }
 
+function isMissingAreaColumn(error) {
+  return (
+    error?.message?.includes("plot_area") ||
+    error?.message?.includes("usable_area") ||
+    error?.message?.includes("built_up_area")
+  );
+}
+
 async function uploadFileToStorage(file) {
   const supabase = getSupabaseBrowserClient();
 
@@ -207,15 +267,17 @@ async function uploadFileToStorage(file) {
   return data.publicUrl;
 }
 
-function Field({ label, children, required = false }) {
+function Field({ label, children, required = false, asDiv = false }) {
+  const Wrapper = asDiv ? "div" : "label";
+
   return (
-    <label className="block">
+    <Wrapper className="block">
       <span className="text-sm font-semibold text-ink">
         {label}
         {required ? <span className="text-brand-700"> *</span> : null}
       </span>
       <span className="mt-2 block">{children}</span>
-    </label>
+    </Wrapper>
   );
 }
 
@@ -238,6 +300,7 @@ export default function AdminPropertyForm() {
   const [isSaving, setIsSaving] = useState(false);
 
   const previewProperty = useMemo(() => formToProperty(form), [form]);
+  const selectedFeatures = useMemo(() => splitLines(form.features), [form.features]);
   const exportJson = useMemo(
     () => JSON.stringify(savedProperties, null, 2),
     [savedProperties]
@@ -264,10 +327,10 @@ export default function AdminPropertyForm() {
         ]);
         let { data, error } = propertiesResponse;
 
-        if (isMissingMapColumn(error)) {
+        if (isMissingMapColumn(error) || isMissingAreaColumn(error)) {
           const fallbackResponse = await supabase
             .from("properties")
-            .select(adminSelectWithoutMap)
+            .select(adminSelectBase)
             .order("created_at", { ascending: false });
 
           data = fallbackResponse.data;
@@ -321,6 +384,22 @@ export default function AdminPropertyForm() {
       ...current,
       [field]: value
     }));
+  }
+
+  function toggleFeature(feature) {
+    setCopied(false);
+    setMessage("");
+    setForm((current) => {
+      const currentFeatures = splitLines(current.features);
+      const nextFeatures = currentFeatures.includes(feature)
+        ? currentFeatures.filter((item) => item !== feature)
+        : [...currentFeatures, feature];
+
+      return {
+        ...current,
+        features: uniqueItems(nextFeatures).join("\n")
+      };
+    });
   }
 
   function persistLocal(nextProperties) {
@@ -432,7 +511,6 @@ export default function AdminPropertyForm() {
       property.title,
       property.price,
       property.location,
-      property.size,
       property.layout,
       property.shortDescription,
       property.description
@@ -440,6 +518,11 @@ export default function AdminPropertyForm() {
 
     if (requiredFields.some((field) => !field)) {
       setMessage("Vyplňte povinná pole označená hvězdičkou.");
+      return;
+    }
+
+    if (!property.plotArea && !property.usableArea && !property.builtUpArea) {
+      setMessage("Vyplňte alespoň jednu plochu nemovitosti.");
       return;
     }
 
@@ -461,6 +544,13 @@ export default function AdminPropertyForm() {
       setIsSaving(false);
 
       if (error) {
+        if (isMissingAreaColumn(error)) {
+          setMessage(
+            "Uložení se nepovedlo: v Supabase chybí sloupce pro plochy. Spusťte SQL soubor supabase/add-property-area-fields.sql."
+          );
+          return;
+        }
+
         setMessage(`Uložení do Supabase se nepovedlo: ${error.message}`);
         return;
       }
@@ -553,6 +643,12 @@ export default function AdminPropertyForm() {
         onSubmit={handleSubmit}
         className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm sm:p-6"
       >
+        <datalist id="area-options">
+          {areaOptions.map((area) => (
+            <option key={area} value={area} />
+          ))}
+        </datalist>
+
         <div className="flex flex-col gap-4 border-b border-zinc-200 pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-700">
@@ -693,18 +789,34 @@ export default function AdminPropertyForm() {
             />
           </Field>
 
-          <Field label="Velikost" required>
-            <select
+          <Field label="Plocha pozemku">
+            <input
               className={inputClass}
-              value={form.size}
-              onChange={(event) => updateField("size", event.target.value)}
-            >
-              {sizeOptions.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
+              list="area-options"
+              value={form.plotArea}
+              onChange={(event) => updateField("plotArea", event.target.value)}
+              placeholder="např. 620 m²"
+            />
+          </Field>
+
+          <Field label="Užitná plocha">
+            <input
+              className={inputClass}
+              list="area-options"
+              value={form.usableArea}
+              onChange={(event) => updateField("usableArea", event.target.value)}
+              placeholder="např. 86 m²"
+            />
+          </Field>
+
+          <Field label="Zastavěná plocha">
+            <input
+              className={inputClass}
+              list="area-options"
+              value={form.builtUpArea}
+              onChange={(event) => updateField("builtUpArea", event.target.value)}
+              placeholder="např. 124 m²"
+            />
           </Field>
 
           <Field label="Dispozice / typ" required>
@@ -722,7 +834,7 @@ export default function AdminPropertyForm() {
           </Field>
 
           <div className="md:col-span-2">
-            <Field label="Hlavní obrázek">
+            <Field label="Hlavní obrázek" asDiv>
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
                 <input
                   className={inputClass}
@@ -766,7 +878,7 @@ export default function AdminPropertyForm() {
             />
           </Field>
 
-          <Field label="Galerie obrázků">
+          <Field label="Galerie obrázků" asDiv>
             <div className="space-y-3">
               <textarea
                 className={textareaClass}
@@ -801,13 +913,38 @@ export default function AdminPropertyForm() {
             />
           </Field>
 
-          <Field label="Hlavní vlastnosti">
-            <textarea
-              className={textareaClass}
-              value={form.features}
-              onChange={(event) => updateField("features", event.target.value)}
-              placeholder={"Balkon\nSklep\nParkování"}
-            />
+          <Field label="Hlavní vlastnosti" asDiv>
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {featureOptions.map((feature) => {
+                  const isSelected = selectedFeatures.includes(feature);
+
+                  return (
+                    <button
+                      key={feature}
+                      type="button"
+                      onClick={() => toggleFeature(feature)}
+                      className={`focus-ring inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${
+                        isSelected
+                          ? "border-brand-700 bg-brand-700 text-white"
+                          : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100"
+                      }`}
+                    >
+                      {isSelected ? (
+                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                      ) : null}
+                      {feature}
+                    </button>
+                  );
+                })}
+              </div>
+              <textarea
+                className={textareaClass}
+                value={form.features}
+                onChange={(event) => updateField("features", event.target.value)}
+                placeholder={"Vlastní vlastnost na každý řádek\nNapř. krbová kamna"}
+              />
+            </div>
           </Field>
         </div>
 
@@ -882,9 +1019,11 @@ export default function AdminPropertyForm() {
                 "Krátký popis se zobrazí v kartě nemovitosti."}
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-zinc-600">
-              <span className="rounded-full bg-zinc-100 px-3 py-1">
-                {previewProperty.size || "Velikost"}
-              </span>
+              {getAreaItems(previewProperty).map((area) => (
+                <span key={area.key} className="rounded-full bg-zinc-100 px-3 py-1">
+                  {area.shortLabel}: {area.value}
+                </span>
+              ))}
               <span className="rounded-full bg-zinc-100 px-3 py-1">
                 {previewProperty.layout || "Dispozice"}
               </span>
@@ -911,6 +1050,11 @@ export default function AdminPropertyForm() {
                   <p className="mt-1 text-sm text-zinc-500">
                     {property.location} · {property.price}
                   </p>
+                  {property.createdAt ? (
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Vloženo {formatPropertyDate(property.createdAt)}
+                    </p>
+                  ) : null}
                   <div className="mt-3 flex gap-2">
                     <button
                       type="button"
