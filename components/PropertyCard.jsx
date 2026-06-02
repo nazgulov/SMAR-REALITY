@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Check, MapPin } from "lucide-react";
+import { ArrowRight, Check, House, MapPin, Ruler } from "lucide-react";
 import { propertyTypeLabels } from "@/data/properties";
-import { getAreaItems } from "@/lib/property-display";
+import { getAreaItems, getPrimarySizeLabel } from "@/lib/property-display";
 
 const badgeStyles = {
   prodej: "bg-brand-700 text-white",
@@ -12,7 +12,8 @@ const badgeStyles = {
 export default function PropertyCard({ property }) {
   const typeLabel = propertyTypeLabels[property.type] ?? property.type;
   const areaItems = getAreaItems(property);
-  const featurePreview = (property.features ?? []).slice(0, 3);
+  const primarySize = getPrimarySizeLabel(property);
+  const featurePreview = (property.features ?? []).slice(0, 2);
 
   return (
     <Link
@@ -20,8 +21,8 @@ export default function PropertyCard({ property }) {
       className="focus-ring group block rounded-lg"
       aria-label={`Zobrazit detail: ${property.title}`}
     >
-      <article className="h-full overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm transition duration-200 group-hover:-translate-y-1 group-hover:shadow-soft">
-        <div className="relative h-56 overflow-hidden bg-zinc-200">
+      <article className="flex h-full flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm transition duration-200 group-hover:-translate-y-1 group-hover:shadow-soft">
+        <div className="relative aspect-[4/3] overflow-hidden bg-zinc-200">
           <Image
             src={property.image}
             alt={property.title}
@@ -35,37 +36,48 @@ export default function PropertyCard({ property }) {
             {typeLabel}
           </span>
         </div>
-        <div className="flex h-[calc(100%-14rem)] flex-col p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-semibold leading-6 text-ink">
-                {property.title}
-              </h3>
-              <p className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
-                <MapPin className="h-4 w-4 shrink-0 text-brand-700" />
-                {property.location}
-              </p>
-            </div>
-          </div>
-          <p className="mt-4 text-xl font-semibold text-brand-900">
+        <div className="flex flex-1 flex-col p-5">
+          <p className="text-xl font-semibold text-brand-900">
             {property.price}
           </p>
-          <p className="mt-3 line-clamp-3 text-sm leading-6 text-zinc-600">
+          <h3 className="mt-3 line-clamp-2 text-lg font-semibold leading-6 text-ink">
+            {property.title}
+          </h3>
+          <p className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
+            <MapPin className="h-4 w-4 shrink-0 text-brand-700" aria-hidden="true" />
+            <span className="line-clamp-1">{property.location}</span>
+          </p>
+
+          <div className="mt-4 grid grid-cols-2 gap-2 text-sm text-zinc-700">
+            {property.layout ? (
+              <span className="flex min-h-11 items-center gap-2 rounded-lg bg-zinc-100 px-3 font-semibold">
+                <House className="h-4 w-4 shrink-0 text-brand-700" aria-hidden="true" />
+                <span className="line-clamp-1">{property.layout}</span>
+              </span>
+            ) : null}
+            {primarySize ? (
+              <span className="flex min-h-11 items-center gap-2 rounded-lg bg-zinc-100 px-3 font-semibold">
+                <Ruler className="h-4 w-4 shrink-0 text-brand-700" aria-hidden="true" />
+                {primarySize}
+              </span>
+            ) : null}
+          </div>
+
+          {areaItems.length > 1 ? (
+            <div className="mt-2 grid gap-2 text-xs font-semibold text-zinc-600 sm:grid-cols-2">
+              {areaItems.slice(0, 2).map((area) => (
+                <span key={area.key} className="rounded-lg bg-zinc-50 px-3 py-2">
+                  {area.shortLabel}: {area.value}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <p className="mt-4 line-clamp-2 text-sm leading-6 text-zinc-600">
             {property.shortDescription}
           </p>
+
           <div className="mt-4 grid gap-2 text-xs text-zinc-600">
-            {areaItems.length ? (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {areaItems.map((area) => (
-                  <span
-                    key={area.key}
-                    className="rounded-lg bg-zinc-100 px-3 py-2 font-semibold"
-                  >
-                    {area.shortLabel}: {area.value}
-                  </span>
-                ))}
-              </div>
-            ) : null}
             {featurePreview.length ? (
               <div className="flex flex-wrap gap-2">
                 {featurePreview.map((feature) => (
@@ -80,11 +92,9 @@ export default function PropertyCard({ property }) {
               </div>
             ) : null}
           </div>
-          <div className="mt-auto flex items-end justify-between gap-4 pt-5">
-            <span className="grid gap-1 text-sm text-zinc-500">
-              <span>{property.layout}</span>
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-3 py-2 text-sm font-semibold text-ink transition group-hover:bg-brand-700 group-hover:text-white">
+
+          <div className="mt-auto pt-5">
+            <span className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-100 px-3 py-2.5 text-sm font-semibold text-ink transition group-hover:bg-brand-700 group-hover:text-white">
               Zobrazit detail
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </span>
