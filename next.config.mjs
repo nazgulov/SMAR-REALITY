@@ -27,6 +27,10 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "*.sdn.cz"
+      },
+      {
+        protocol: "https",
+        hostname: "svoboda-and-williams.b-cdn.net"
       }
     ]
   }

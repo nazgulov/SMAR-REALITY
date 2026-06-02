@@ -9,20 +9,27 @@ export const properties = [
     plotArea: "3 559 m²",
     usableArea: "350 m²",
     builtUpArea: "421 m²",
-    layout: "5 a více pokojů, rodinný dům",
+    layout: "7+kk, rodinný dům",
     createdAt: "2026-06-02T10:00:00.000Z",
     shortDescription:
-      "Reprezentativní rodinný dům po rekonstrukci s velkým pozemkem, zahradou, garáží a sklepem v klidné lokalitě Lužických hor.",
+      "Velkorysý rodinný dům 7+kk po rozsáhlé rekonstrukci s velkým pozemkem, zahradou, garáží, sklepem a vlastním rybníkem.",
     description:
-      "Nabízíme prostorný rodinný dům v Heřmanicích v Podještědí, který kombinuje velkorysé bydlení, rozsáhlý pozemek a příjemné soukromí v podhůří Lužických hor. Dům prošel rekonstrukcí a nabízí několik obytných místností, praktické zázemí, sklepní prostory, garáž a dostatek místa pro parkování. Díky velké zahradě a klidnému okolí je nemovitost vhodná pro rodinné bydlení, vícegenerační využití i reprezentativní rekreační zázemí.",
+      "Nabízíme reprezentativní rodinný dům v Jablonném v Podještědí, v klidné části obklopené zelení a krajinou Lužických hor. Původní stavba z roku 1924 prošla citlivou rozsáhlou rekonstrukcí, která zachovala charakter domu a současně doplnila komfort moderního bydlení. Dispozice 7+kk poskytuje velkorysý prostor pro rodinu, vícegenerační bydlení i kombinaci soukromého bydlení s pracovním zázemím. V přízemí navazuje obytná část na kuchyň a jídelnu, dům nabízí několik ložnic, koupelny, technické zázemí, úložné prostory a praktický sklep o ploše přibližně 45 m². Součástí rekonstrukce byly mimo jiné rozvody, střecha, zateplení, okna s trojskly a hydroizolace. O vytápění se stará tepelné čerpadlo doplněné kachlovými kamny, která podtrhují atmosféru domu. Pozemek o výměře 3 559 m² nabízí upravenou zahradu, dostatek soukromí, venkovní posezení, parkování, garáž a vlastní rybník. Díky své poloze je nemovitost vhodná pro trvalé bydlení i jako nadstandardní venkovské zázemí s rychlou dostupností služeb v okolí.",
     image:
-      "https://d18-a.sdn.cz/d_18/c_img_QM_K5/AByB3ms.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90",
+      "https://svoboda-and-williams.b-cdn.net/933100/99971660.webp?width=1680",
     gallery: [
-      "https://d18-a.sdn.cz/d_18/c_img_QM_K5/AByB3ms.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90",
-      "https://d18-a.sdn.cz/d_18/c_img_QJ_Jw/bC6EBHB.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90",
-      "https://d18-a.sdn.cz/d_18/c_img_QO_K5/DjSB3mm.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90",
-      "https://d18-a.sdn.cz/d_18/c_img_QP_J9/j2LB3mo.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90",
-      "https://d18-a.sdn.cz/d_18/c_img_QP_J9/l31B3mq.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90"
+      "https://svoboda-and-williams.b-cdn.net/933100/99971660.webp?width=1680",
+      "https://svoboda-and-williams.b-cdn.net/933101/99971680.webp?width=1680",
+      "https://svoboda-and-williams.b-cdn.net/933102/99971674.webp?width=1680",
+      "https://svoboda-and-williams.b-cdn.net/933103/99971682.webp?width=1680",
+      "https://svoboda-and-williams.b-cdn.net/933104/99971646.webp?width=1680",
+      "https://svoboda-and-williams.b-cdn.net/933105/99971648.webp?width=1680",
+      "https://svoboda-and-williams.b-cdn.net/933106/99971694.webp?width=1680",
+      "https://svoboda-and-williams.b-cdn.net/933107/99971686.webp?width=1680",
+      "https://svoboda-and-williams.b-cdn.net/933108/99971706.webp?width=1680",
+      "https://svoboda-and-williams.b-cdn.net/933109/99971690.webp?width=1680",
+      "https://svoboda-and-williams.b-cdn.net/933110/99971716.webp?width=1680",
+      "https://svoboda-and-williams.b-cdn.net/933111/99971702.webp?width=1680"
     ],
     matterportUrl: "",
     mapUrl: "Jablonné v Podještědí - Heřmanice v Podještědí",
@@ -34,6 +41,8 @@ export const properties = [
       "Tepelné čerpadlo",
       "Vlastní studna",
       "Septik",
+      "Kachlová kamna",
+      "Vlastní rybník",
       "Po rekonstrukci",
       "K nastěhování ihned"
     ]
