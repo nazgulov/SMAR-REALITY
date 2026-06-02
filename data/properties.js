@@ -1,5 +1,44 @@
 export const properties = [
   {
+    id: "prodej-rodinny-dum-hermanice-v-podjestedi",
+    title: "Rodinný dům se zahradou v Heřmanicích v Podještědí",
+    type: "prodej",
+    price: "25 000 000 Kč",
+    location: "Jablonné v Podještědí - Heřmanice v Podještědí",
+    size: "350 m²",
+    plotArea: "3 559 m²",
+    usableArea: "350 m²",
+    builtUpArea: "421 m²",
+    layout: "5 a více pokojů, rodinný dům",
+    createdAt: "2026-06-02T10:00:00.000Z",
+    shortDescription:
+      "Reprezentativní rodinný dům po rekonstrukci s velkým pozemkem, zahradou, garáží a sklepem v klidné lokalitě Lužických hor.",
+    description:
+      "Nabízíme prostorný rodinný dům v Heřmanicích v Podještědí, který kombinuje velkorysé bydlení, rozsáhlý pozemek a příjemné soukromí v podhůří Lužických hor. Dům prošel rekonstrukcí a nabízí několik obytných místností, praktické zázemí, sklepní prostory, garáž a dostatek místa pro parkování. Díky velké zahradě a klidnému okolí je nemovitost vhodná pro rodinné bydlení, vícegenerační využití i reprezentativní rekreační zázemí.",
+    image:
+      "https://d18-a.sdn.cz/d_18/c_img_QM_K5/AByB3ms.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90",
+    gallery: [
+      "https://d18-a.sdn.cz/d_18/c_img_QM_K5/AByB3ms.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90",
+      "https://d18-a.sdn.cz/d_18/c_img_QJ_Jw/bC6EBHB.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90",
+      "https://d18-a.sdn.cz/d_18/c_img_QO_K5/DjSB3mm.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90",
+      "https://d18-a.sdn.cz/d_18/c_img_QP_J9/j2LB3mo.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90",
+      "https://d18-a.sdn.cz/d_18/c_img_QP_J9/l31B3mq.jpeg?fl=res,2000,2000,1%7Cshr,,20%7Cjpg,90"
+    ],
+    matterportUrl: "",
+    mapUrl: "Jablonné v Podještědí - Heřmanice v Podještědí",
+    features: [
+      "Sklep",
+      "Garáž",
+      "Parkovací stání",
+      "Zahrada",
+      "Tepelné čerpadlo",
+      "Vlastní studna",
+      "Septik",
+      "Po rekonstrukci",
+      "K nastěhování ihned"
+    ]
+  },
+  {
     id: "rodinny-dum-ricany",
     title: "Rodinný dům se zahradou",
     type: "prodej",
