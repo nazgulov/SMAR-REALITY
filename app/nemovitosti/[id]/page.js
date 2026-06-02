@@ -1,18 +1,9 @@
 import { notFound } from "next/navigation";
 import PropertyDetail from "@/components/PropertyDetail";
-import { getAllProperties, getPropertyById } from "@/lib/properties";
+import { getPropertyById } from "@/lib/properties";
 
-export async function generateStaticParams() {
-  if (process.env.GITHUB_PAGES !== "true") {
-    return [];
-  }
-
-  const properties = await getAllProperties();
-
-  return properties.map((property) => ({
-    id: property.id
-  }));
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
