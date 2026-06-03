@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import MatterportEmbed from "@/components/MatterportEmbed";
 import MapEmbed from "@/components/MapEmbed";
+import VideoEmbed from "@/components/VideoEmbed";
 import { propertyTypeLabels } from "@/data/properties";
 import { formatPropertyDate, getAreaItems } from "@/lib/property-display";
 
@@ -135,6 +136,8 @@ export default function PropertyDetail({ property }) {
             location={property.location}
             title={property.title}
           />
+
+          <VideoEmbed url={property.videoUrl} title={property.title} />
 
           <MatterportEmbed url={property.matterportUrl} title={property.title} />
         </div>

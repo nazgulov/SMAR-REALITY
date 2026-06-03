@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Check, House, MapPin, Ruler } from "lucide-react";
+import { ArrowRight, Check, House, MapPin, PlayCircle, Ruler } from "lucide-react";
 import { propertyTypeLabels } from "@/data/properties";
 import { getAreaItems, getPrimarySizeLabel } from "@/lib/property-display";
 
@@ -35,6 +35,12 @@ export default function PropertyCard({ property }) {
           >
             {typeLabel}
           </span>
+          {property.videoUrl ? (
+            <span className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-ink shadow-sm">
+              <PlayCircle className="h-3.5 w-3.5 text-brand-700" aria-hidden="true" />
+              Video
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-1 flex-col p-5">
           <p className="text-xl font-semibold text-brand-900">

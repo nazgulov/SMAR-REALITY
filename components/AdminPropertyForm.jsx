@@ -9,6 +9,7 @@ import {
   LogIn,
   LogOut,
   Pencil,
+  PlayCircle,
   Plus,
   RefreshCw,
   Save,
@@ -27,11 +28,14 @@ import {
 } from "@/lib/property-mappers";
 import { normalizeMapInput } from "@/lib/map-utils";
 import { formatPropertyDate, getAreaItems } from "@/lib/property-display";
+import { normalizeVideoInput } from "@/lib/video-utils";
 
 const STORAGE_KEY = "smar-admin-properties";
 const supabaseConfigIssue = getSupabaseConfigIssue();
 const supabaseEnabled = hasSupabaseConfig();
 const adminSelect =
+  "id,title,type,price,location,size,plot_area,usable_area,built_up_area,layout,short_description,description,image,gallery,matterport_url,video_url,map_url,features,published,created_at";
+const adminSelectWithoutVideo =
   "id,title,type,price,location,size,plot_area,usable_area,built_up_area,layout,short_description,description,image,gallery,matterport_url,map_url,features,published,created_at";
 const adminSelectBase =
   "id,title,type,price,location,size,layout,short_description,description,image,gallery,matterport_url,features,published,created_at";
@@ -52,6 +56,7 @@ const emptyForm = {
   image: "",
   gallery: "",
   matterportUrl: "",
+  videoUrl: "",
   mapUrl: "",
   features: "",
   createdAt: ""
@@ -193,6 +198,7 @@ function propertyToForm(property) {
     size: property.size || usableArea,
     gallery: property.gallery.join("\n"),
     mapUrl: property.mapUrl ?? "",
+    videoUrl: property.videoUrl ?? "",
     features: uniqueItems(property.features ?? []).join("\n")
   };
 }
@@ -220,6 +226,7 @@ function formToProperty(form) {
     image,
     gallery: splitLines(form.gallery).length ? splitLines(form.gallery) : [image],
     matterportUrl: form.matterportUrl.trim(),
+    videoUrl: normalizeVideoInput(form.videoUrl),
     mapUrl: normalizeMapInput(form.mapUrl),
     features: uniqueItems(splitLines(form.features)),
     createdAt: form.createdAt || new Date().toISOString()
@@ -256,6 +263,10 @@ function getFriendlyErrorMessage(error) {
 
 function isMissingMapColumn(error) {
   return error?.message?.includes("map_url");
+}
+
+function isMissingVideoColumn(error) {
+  return error?.message?.includes("video_url");
 }
 
 function isMissingAreaColumn(error) {
@@ -372,6 +383,16 @@ export default function AdminPropertyForm() {
             .order("created_at", { ascending: false })
         ]);
         let { data, error } = propertiesResponse;
+
+        if (isMissingVideoColumn(error)) {
+          const fallbackResponse = await supabase
+            .from("properties")
+            .select(adminSelectWithoutVideo)
+            .order("created_at", { ascending: false });
+
+          data = fallbackResponse.data;
+          error = fallbackResponse.error;
+        }
 
         if (isMissingMapColumn(error) || isMissingAreaColumn(error)) {
           const fallbackResponse = await supabase
@@ -595,6 +616,13 @@ export default function AdminPropertyForm() {
       setIsSaving(false);
 
       if (error) {
+        if (isMissingVideoColumn(error)) {
+          setMessage(
+            "Uložení se nepovedlo: v Supabase chybí sloupec video_url. Spusťte SQL soubor supabase/add-property-video-url.sql."
+          );
+          return;
+        }
+
         if (isMissingAreaColumn(error)) {
           setMessage(
             "Uložení se nepovedlo: v Supabase chybí sloupce pro plochy. Spusťte SQL soubor supabase/add-property-area-fields.sql."
@@ -963,6 +991,15 @@ export default function AdminPropertyForm() {
             />
           </Field>
 
+          <Field label="Video URL">
+            <input
+              className={inputClass}
+              value={form.videoUrl}
+              onChange={(event) => updateField("videoUrl", event.target.value)}
+              placeholder="YouTube, Vimeo, přímé MP4/WebM video nebo iframe src"
+            />
+          </Field>
+
           <Field label="Hlavní vlastnosti" asDiv>
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -1053,6 +1090,12 @@ export default function AdminPropertyForm() {
             <span className="absolute left-4 top-4 rounded-full bg-brand-700 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-white">
               {propertyTypeLabels[previewProperty.type]}
             </span>
+            {previewProperty.videoUrl ? (
+              <span className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-ink shadow-sm">
+                <PlayCircle className="h-3.5 w-3.5 text-brand-700" aria-hidden="true" />
+                Video
+              </span>
+            ) : null}
           </div>
           <div className="p-5">
             <p className="text-sm text-zinc-500">
