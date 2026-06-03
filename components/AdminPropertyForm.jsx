@@ -575,6 +575,31 @@ export default function AdminPropertyForm() {
     }
   }
 
+  async function handleVideoUpload(event) {
+    const [file] = Array.from(event.target.files ?? []);
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const videoUrl =
+        supabaseEnabled && session
+          ? await uploadFileToStorage(file)
+          : await readFileAsDataUrl(file);
+      updateField("videoUrl", videoUrl);
+      setMessage(
+        supabaseEnabled && session
+          ? "Video bylo nahrané do Supabase Storage."
+          : "Video bylo načtené lokálně do prohlížeče."
+      );
+    } catch {
+      setMessage("Video se nepodařilo načíst.");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
 
@@ -992,12 +1017,24 @@ export default function AdminPropertyForm() {
           </Field>
 
           <Field label="Video URL">
-            <input
-              className={inputClass}
-              value={form.videoUrl}
-              onChange={(event) => updateField("videoUrl", event.target.value)}
-              placeholder="YouTube, Vimeo, přímé MP4/WebM video nebo iframe src"
-            />
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
+              <input
+                className={inputClass}
+                value={form.videoUrl}
+                onChange={(event) => updateField("videoUrl", event.target.value)}
+                placeholder="YouTube, Vimeo, přímé MP4/WebM video nebo iframe src"
+              />
+              <label className="focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100">
+                <PlayCircle className="h-4 w-4" aria-hidden="true" />
+                Nahrát video z PC
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoUpload}
+                  className="sr-only"
+                />
+              </label>
+            </div>
           </Field>
 
           <Field label="Hlavní vlastnosti" asDiv>
