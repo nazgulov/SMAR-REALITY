@@ -53,6 +53,22 @@ export default function Footer() {
           </div>
         </div>
       </div>
+      <div className="border-t border-zinc-200">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <p>2026 SMAR s.r.o.</p>
+          <p>
+            Stránku vytvořila firma{" "}
+            <a
+              href="https://www.smar.cz"
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-brand-700 transition hover:text-brand-900"
+            >
+              SMAR s.r.o.
+            </a>
+          </p>
+        </div>
+      </div>
     </footer>
   );
 }
