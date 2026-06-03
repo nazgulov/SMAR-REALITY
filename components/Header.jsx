@@ -3,6 +3,7 @@ import BrandLogo from "@/components/BrandLogo";
 
 const navItems = [
   { href: "/", label: "Nemovitosti" },
+  { href: "/pro-maklere", label: "Pro makléře" },
   { href: "/sprava-nemovitosti", label: "Jak přidávat" },
   { href: "/admin/nemovitosti", label: "Administrace" }
 ];

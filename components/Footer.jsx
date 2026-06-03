@@ -22,6 +22,9 @@ export default function Footer() {
             <Link className="hover:text-brand-700" href="/sprava-nemovitosti">
               Jak přidávat nemovitosti
             </Link>
+            <Link className="hover:text-brand-700" href="/pro-maklere">
+              Pro makléře
+            </Link>
             <Link className="hover:text-brand-700" href="/kontakt">
               Kontakt
             </Link>
