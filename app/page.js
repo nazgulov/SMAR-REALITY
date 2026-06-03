@@ -1,6 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowDown, Building2, KeyRound, Mail } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowRight,
+  Building2,
+  KeyRound,
+  Mail,
+  Users
+} from "lucide-react";
 import HomePropertyBrowser from "@/components/HomePropertyBrowser";
 import SectionTitle from "@/components/SectionTitle";
 import { getAllProperties, getPropertiesByType } from "@/lib/properties";
@@ -57,6 +64,16 @@ export default async function HomePage() {
                 <Mail className="ml-2 h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
+            <Link
+              href="/pro-maklere"
+              className="focus-ring mt-5 inline-flex max-w-full items-start gap-2 rounded-lg bg-black/20 px-3 py-2 text-sm font-medium text-zinc-100 backdrop-blur transition hover:bg-white/15 hover:text-white sm:items-center"
+            >
+              <Users className="mt-0.5 h-4 w-4 shrink-0 text-teal-200 sm:mt-0" aria-hidden="true" />
+              <span className="min-w-0 leading-5">
+                Pro makléře: vlastní portál a zveřejnění nabídky pod SMAR Reality
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+            </Link>
           </div>
         </div>
       </section>
