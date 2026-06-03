@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowRight,
   Building2,
+  Info,
   KeyRound,
   Mail,
   Users
@@ -74,6 +75,19 @@ export default async function HomePage() {
               </span>
               <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-amber-200 bg-amber-50">
+        <div className="mx-auto flex max-w-7xl gap-3 px-4 py-4 text-sm text-amber-950 sm:px-6 lg:px-8">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">Testovací verze webu</p>
+            <p className="mt-1 leading-6">
+              Tento web neslouží k ostrému provozu. Jde pouze o testovací
+              stránku na dočasné doméně.
+            </p>
           </div>
         </div>
       </section>
