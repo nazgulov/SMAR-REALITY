@@ -375,7 +375,6 @@ export default function AdminPropertyForm() {
   const [session, setSession] = useState(null);
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
-  const [isAuthReady, setIsAuthReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -391,7 +390,6 @@ export default function AdminPropertyForm() {
 
     if (!supabase) {
       setSavedProperties([]);
-      setIsAuthReady(true);
       return undefined;
     }
 
@@ -424,7 +422,6 @@ export default function AdminPropertyForm() {
         setMessage(`Supabase data se nepodařilo načíst: ${getFriendlyErrorMessage(error)}`);
       } finally {
         setIsLoading(false);
-        setIsAuthReady(true);
       }
     }
 
@@ -789,24 +786,6 @@ export default function AdminPropertyForm() {
     link.download = "smar-nemovitosti.json";
     link.click();
     URL.revokeObjectURL(url);
-  }
-
-  if (!isAuthReady) {
-    return (
-      <div className="mx-auto max-w-xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="rounded-lg border border-zinc-200 bg-white p-6 text-center shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-700">
-            Administrace
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold text-ink">
-            Ověřuji přihlášení
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-zinc-600">
-            Připravuji zabezpečený přístup do správy nemovitostí.
-          </p>
-        </div>
-      </div>
-    );
   }
 
   if (!session) {
