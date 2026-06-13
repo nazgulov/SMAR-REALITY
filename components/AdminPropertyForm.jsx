@@ -277,6 +277,82 @@ function isMissingAreaColumn(error) {
   );
 }
 
+function isRlsError(error) {
+  const message = error?.message?.toLowerCase() ?? "";
+
+  return (
+    error?.code === "42501" ||
+    message.includes("row-level security") ||
+    message.includes("permission denied")
+  );
+}
+
+function getAdminErrorMessage(error) {
+  if (isRlsError(error)) {
+    return "Supabase RLS nepovolilo akci. Zkontrolujte, že přihlášený účet je vložený v tabulce public.admin_users.";
+  }
+
+  return getFriendlyErrorMessage(error);
+}
+
+async function fetchAdminProperties(supabase) {
+  let { data, error } = await supabase
+    .from("properties")
+    .select(adminSelect)
+    .order("created_at", { ascending: false });
+
+  if (isMissingVideoColumn(error)) {
+    const fallbackResponse = await supabase
+      .from("properties")
+      .select(adminSelectWithoutVideo)
+      .order("created_at", { ascending: false });
+
+    data = fallbackResponse.data;
+    error = fallbackResponse.error;
+  }
+
+  if (isMissingMapColumn(error) || isMissingAreaColumn(error)) {
+    const fallbackResponse = await supabase
+      .from("properties")
+      .select(adminSelectBase)
+      .order("created_at", { ascending: false });
+
+    data = fallbackResponse.data;
+    error = fallbackResponse.error;
+  }
+
+  if (error) {
+    return { properties: [], error };
+  }
+
+  return { properties: data.map(fromSupabaseProperty), error: null };
+}
+
+async function checkAdminMembership(supabase, currentSession) {
+  const userId = currentSession?.user?.id;
+  const userEmail = currentSession?.user?.email;
+
+  if (!userId) {
+    return "";
+  }
+
+  const { data, error } = await supabase
+    .from("admin_users")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    return `Nepodařilo se ověřit správcovské oprávnění: ${getFriendlyErrorMessage(error)}`;
+  }
+
+  if (!data) {
+    return `Účet ${userEmail || "bez e-mailu"} není v tabulce public.admin_users. Přidávání a editace může být blokovaná RLS pravidly.`;
+  }
+
+  return "";
+}
+
 async function uploadFileToStorage(file) {
   const supabase = getSupabaseBrowserClient();
 
@@ -349,6 +425,7 @@ export default function AdminPropertyForm() {
   const [editingId, setEditingId] = useState(null);
   const [isSlugManual, setIsSlugManual] = useState(false);
   const [message, setMessage] = useState("");
+  const [adminAccessWarning, setAdminAccessWarning] = useState("");
   const [copied, setCopied] = useState(false);
   const [session, setSession] = useState(null);
   const [authEmail, setAuthEmail] = useState("");
@@ -363,6 +440,50 @@ export default function AdminPropertyForm() {
     [savedProperties]
   );
 
+  async function refreshAdminAccess(currentSession) {
+    const supabase = getSupabaseBrowserClient();
+
+    if (!supabase || !currentSession) {
+      setAdminAccessWarning("");
+      return;
+    }
+
+    const warning = await checkAdminMembership(supabase, currentSession);
+    setAdminAccessWarning(warning);
+  }
+
+  async function refreshAdminProperties({ fallbackToLocal = true } = {}) {
+    const supabase = getSupabaseBrowserClient();
+
+    if (!supabase) {
+      setSavedProperties(readStoredProperties());
+      return false;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { properties, error } = await fetchAdminProperties(supabase);
+
+      if (error) {
+        setSavedProperties(fallbackToLocal ? readStoredProperties() : []);
+        setMessage(
+          `Supabase data se nepodařilo načíst: ${getAdminErrorMessage(error)}`
+        );
+        return false;
+      }
+
+      setSavedProperties(properties);
+      return true;
+    } catch (error) {
+      setSavedProperties(fallbackToLocal ? readStoredProperties() : []);
+      setMessage(`Supabase data se nepodařilo načíst: ${getAdminErrorMessage(error)}`);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
 
@@ -372,61 +493,24 @@ export default function AdminPropertyForm() {
     }
 
     async function loadAdminState() {
-      setIsLoading(true);
-
       try {
-        const [{ data: sessionData }, propertiesResponse] = await Promise.all([
-          supabase.auth.getSession(),
-          supabase
-            .from("properties")
-            .select(adminSelect)
-            .order("created_at", { ascending: false })
-        ]);
-        let { data, error } = propertiesResponse;
-
-        if (isMissingVideoColumn(error)) {
-          const fallbackResponse = await supabase
-            .from("properties")
-            .select(adminSelectWithoutVideo)
-            .order("created_at", { ascending: false });
-
-          data = fallbackResponse.data;
-          error = fallbackResponse.error;
-        }
-
-        if (isMissingMapColumn(error) || isMissingAreaColumn(error)) {
-          const fallbackResponse = await supabase
-            .from("properties")
-            .select(adminSelectBase)
-            .order("created_at", { ascending: false });
-
-          data = fallbackResponse.data;
-          error = fallbackResponse.error;
-        }
-
+        const { data: sessionData } = await supabase.auth.getSession();
         setSession(sessionData.session);
-
-        if (error) {
-          setSavedProperties(readStoredProperties());
-          setMessage(
-            "Supabase data se nepodařilo načíst. Dočasně zobrazuji lokální položky."
-          );
-        } else {
-          setSavedProperties(data.map(fromSupabaseProperty));
-        }
+        await refreshAdminAccess(sessionData.session);
+        await refreshAdminProperties();
       } catch (error) {
         setSavedProperties(readStoredProperties());
-        setMessage(`Supabase data se nepodařilo načíst: ${getFriendlyErrorMessage(error)}`);
+        setMessage(`Supabase data se nepodařilo načíst: ${getAdminErrorMessage(error)}`);
       }
-
-      setIsLoading(false);
     }
 
     loadAdminState();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, nextSession) => {
+      async (_event, nextSession) => {
         setSession(nextSession);
+        await refreshAdminAccess(nextSession);
+        await refreshAdminProperties({ fallbackToLocal: !nextSession });
       }
     );
 
@@ -492,7 +576,7 @@ export default function AdminPropertyForm() {
     setIsSaving(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: authEmail,
         password: authPassword
       });
@@ -502,8 +586,14 @@ export default function AdminPropertyForm() {
         return;
       }
 
+      if (data.session) {
+        setSession(data.session);
+        await refreshAdminAccess(data.session);
+        await refreshAdminProperties({ fallbackToLocal: false });
+      }
+
       setAuthPassword("");
-      setMessage("Správce je přihlášený.");
+      setMessage("Správce je přihlášený a data byla znovu načtena.");
     } catch (error) {
       setMessage(`Přihlášení se nepovedlo: ${getFriendlyErrorMessage(error)}`);
     } finally {
@@ -520,6 +610,8 @@ export default function AdminPropertyForm() {
 
     await supabase.auth.signOut();
     setSession(null);
+    setAdminAccessWarning("");
+    await refreshAdminProperties();
     setMessage("Správce je odhlášený.");
   }
 
@@ -655,7 +747,7 @@ export default function AdminPropertyForm() {
           return;
         }
 
-        setMessage(`Uložení do Supabase se nepovedlo: ${error.message}`);
+        setMessage(`Uložení do Supabase se nepovedlo: ${getAdminErrorMessage(error)}`);
         return;
       }
 
@@ -663,6 +755,7 @@ export default function AdminPropertyForm() {
         (item) => item.id !== (editingId ?? property.id)
       );
       setSavedProperties([...withoutCurrent, property]);
+      await refreshAdminProperties({ fallbackToLocal: false });
       setForm(emptyForm);
       setEditingId(null);
       setIsSlugManual(false);
@@ -706,9 +799,19 @@ export default function AdminPropertyForm() {
       const { error } = await supabase.from("properties").delete().eq("id", id);
 
       if (error) {
-        setMessage(`Mazání se nepovedlo: ${error.message}`);
+        setMessage(`Mazání se nepovedlo: ${getAdminErrorMessage(error)}`);
         return;
       }
+
+      await refreshAdminProperties({ fallbackToLocal: false });
+
+      if (editingId === id) {
+        setForm(emptyForm);
+        setEditingId(null);
+        setIsSlugManual(false);
+      }
+
+      return;
     }
 
     persistLocal(savedProperties.filter((property) => property.id !== id));
@@ -796,6 +899,11 @@ export default function AdminPropertyForm() {
                     ? `${supabaseConfigIssue} Teď se používá localStorage a JSON export.`
                     : "Doplňte .env.local pro ukládání do Supabase. Teď se používá localStorage a JSON export."}
               </p>
+              {adminAccessWarning ? (
+                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-950">
+                  {adminAccessWarning}
+                </p>
+              ) : null}
             </div>
 
             {supabaseEnabled ? (
