@@ -299,6 +299,20 @@ async function fetchAdminProperties(supabase) {
   return { properties: data.map(fromSupabaseProperty), error: null };
 }
 
+async function checkAdminAccess(supabase, userId) {
+  const { data, error } = await supabase
+    .from("admin_users")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    return { isAdmin: false, error };
+  }
+
+  return { isAdmin: Boolean(data), error: null };
+}
+
 async function uploadFileToStorage(file) {
   const supabase = getSupabaseBrowserClient();
 
@@ -371,6 +385,7 @@ export default function AdminPropertyForm() {
   const [editingId, setEditingId] = useState(null);
   const [isSlugManual, setIsSlugManual] = useState(false);
   const [message, setMessage] = useState("");
+  const [adminAccessIssue, setAdminAccessIssue] = useState("");
   const [copied, setCopied] = useState(false);
   const [session, setSession] = useState(null);
   const [authEmail, setAuthEmail] = useState("");
@@ -385,6 +400,38 @@ export default function AdminPropertyForm() {
     () => JSON.stringify(savedProperties, null, 2),
     [savedProperties]
   );
+
+  async function ensureAdminAccess(supabase, currentSession) {
+    const userId = currentSession?.user?.id;
+    const userEmail = currentSession?.user?.email;
+
+    if (!userId) {
+      setSavedProperties([]);
+      setAdminAccessIssue("Přihlášení proběhlo, ale chybí ID uživatele.");
+      return false;
+    }
+
+    const { isAdmin, error } = await checkAdminAccess(supabase, userId);
+
+    if (error) {
+      setSavedProperties([]);
+      setAdminAccessIssue(
+        `Přihlášení proběhlo, ale nepodařilo se ověřit správcovské oprávnění: ${getFriendlyErrorMessage(error)}`
+      );
+      return false;
+    }
+
+    if (!isAdmin) {
+      setSavedProperties([]);
+      setAdminAccessIssue(
+        `Účet ${userEmail || "bez e-mailu"} není přidaný mezi správce v Supabase. V SQL editoru spusťte helper supabase/add-admin-user-by-email.sql. UID účtu: ${userId}`
+      );
+      return false;
+    }
+
+    setAdminAccessIssue("");
+    return true;
+  }
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -406,7 +453,14 @@ export default function AdminPropertyForm() {
         if (!currentSession) {
           setSavedProperties([]);
           setMessage("");
+          setAdminAccessIssue("");
         } else {
+          const hasAdminAccess = await ensureAdminAccess(supabase, currentSession);
+
+          if (!hasAdminAccess) {
+            return;
+          }
+
           const { properties, error } = await fetchAdminProperties(supabase);
 
           if (error) {
@@ -437,20 +491,35 @@ export default function AdminPropertyForm() {
           setForm(emptyForm);
           setEditingId(null);
           setIsSlugManual(false);
+          setAdminAccessIssue("");
           return;
         }
 
         setIsLoading(true);
-        const { properties, error } = await fetchAdminProperties(supabase);
-        setIsLoading(false);
+        try {
+          const hasAdminAccess = await ensureAdminAccess(supabase, nextSession);
 
-        if (error) {
+          if (!hasAdminAccess) {
+            return;
+          }
+
+          const { properties, error } = await fetchAdminProperties(supabase);
+
+          if (error) {
+            setSavedProperties([]);
+            setMessage(
+              `Supabase data se nepodařilo načíst: ${getFriendlyErrorMessage(error)}`
+            );
+          } else {
+            setSavedProperties(properties);
+          }
+        } catch (error) {
           setSavedProperties([]);
           setMessage(
             `Supabase data se nepodařilo načíst: ${getFriendlyErrorMessage(error)}`
           );
-        } else {
-          setSavedProperties(properties);
+        } finally {
+          setIsLoading(false);
         }
       }
     );
@@ -515,6 +584,7 @@ export default function AdminPropertyForm() {
     }
 
     setIsSaving(true);
+    setAdminAccessIssue("");
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -528,6 +598,16 @@ export default function AdminPropertyForm() {
       }
 
       if (data.session) {
+        setSession(data.session);
+
+        const hasAdminAccess = await ensureAdminAccess(supabase, data.session);
+
+        if (!hasAdminAccess) {
+          setAuthPassword("");
+          setMessage("");
+          return;
+        }
+
         const { properties, error: propertiesError } =
           await fetchAdminProperties(supabase);
 
@@ -539,7 +619,6 @@ export default function AdminPropertyForm() {
         }
 
         setSavedProperties(properties);
-        setSession(data.session);
       }
 
       setAuthPassword("");
@@ -561,6 +640,7 @@ export default function AdminPropertyForm() {
     setForm(emptyForm);
     setEditingId(null);
     setIsSlugManual(false);
+    setAdminAccessIssue("");
 
     if (!supabase) {
       setMessage("Správce je odhlášený.");
@@ -867,6 +947,37 @@ export default function AdminPropertyForm() {
             {isSaving ? "Přihlašuji..." : "Přihlásit se"}
           </button>
         </form>
+      </div>
+    );
+  }
+
+  if (session && adminAccessIssue) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
+        <section className="rounded-lg border border-amber-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-700">
+            Administrace
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-ink">
+            Účet nemá oprávnění správce
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-600">
+            Jste přihlášeni jako {session.user.email}. Přihlášení je v pořádku,
+            ale Supabase RLS nepovolila načtení a editaci nemovitostí.
+          </p>
+          <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+            {adminAccessIssue}
+          </div>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            className="focus-ring mt-6 inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            {isSigningOut ? "Odhlašuji..." : "Odhlásit"}
+          </button>
+        </section>
       </div>
     );
   }
