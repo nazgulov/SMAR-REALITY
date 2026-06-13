@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { propertyTypeLabels } from "@/data/properties";
 import {
-  getSupabaseConfigIssue,
   getStorageBucketName,
   getSupabaseBrowserClient,
   hasSupabaseConfig
@@ -31,7 +30,6 @@ import { formatPropertyDate, getAreaItems } from "@/lib/property-display";
 import { normalizeVideoInput } from "@/lib/video-utils";
 
 const STORAGE_KEY = "smar-admin-properties";
-const supabaseConfigIssue = getSupabaseConfigIssue();
 const supabaseEnabled = hasSupabaseConfig();
 const adminSelect =
   "id,title,type,price,location,size,plot_area,usable_area,built_up_area,layout,short_description,description,image,gallery,matterport_url,video_url,map_url,features,published,created_at";
@@ -233,15 +231,6 @@ function formToProperty(form) {
   };
 }
 
-function readStoredProperties() {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -275,6 +264,39 @@ function isMissingAreaColumn(error) {
     error?.message?.includes("usable_area") ||
     error?.message?.includes("built_up_area")
   );
+}
+
+async function fetchAdminProperties(supabase) {
+  let { data, error } = await supabase
+    .from("properties")
+    .select(adminSelect)
+    .order("created_at", { ascending: false });
+
+  if (isMissingVideoColumn(error)) {
+    const fallbackResponse = await supabase
+      .from("properties")
+      .select(adminSelectWithoutVideo)
+      .order("created_at", { ascending: false });
+
+    data = fallbackResponse.data;
+    error = fallbackResponse.error;
+  }
+
+  if (isMissingMapColumn(error) || isMissingAreaColumn(error)) {
+    const fallbackResponse = await supabase
+      .from("properties")
+      .select(adminSelectBase)
+      .order("created_at", { ascending: false });
+
+    data = fallbackResponse.data;
+    error = fallbackResponse.error;
+  }
+
+  if (error) {
+    return { properties: [], error };
+  }
+
+  return { properties: data.map(fromSupabaseProperty), error: null };
 }
 
 async function uploadFileToStorage(file) {
@@ -353,6 +375,7 @@ export default function AdminPropertyForm() {
   const [session, setSession] = useState(null);
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -367,7 +390,8 @@ export default function AdminPropertyForm() {
     const supabase = getSupabaseBrowserClient();
 
     if (!supabase) {
-      setSavedProperties(readStoredProperties());
+      setSavedProperties([]);
+      setIsAuthReady(true);
       return undefined;
     }
 
@@ -375,58 +399,61 @@ export default function AdminPropertyForm() {
       setIsLoading(true);
 
       try {
-        const [{ data: sessionData }, propertiesResponse] = await Promise.all([
-          supabase.auth.getSession(),
-          supabase
-            .from("properties")
-            .select(adminSelect)
-            .order("created_at", { ascending: false })
-        ]);
-        let { data, error } = propertiesResponse;
+        const { data: sessionData } = await supabase.auth.getSession();
+        const currentSession = sessionData.session;
 
-        if (isMissingVideoColumn(error)) {
-          const fallbackResponse = await supabase
-            .from("properties")
-            .select(adminSelectWithoutVideo)
-            .order("created_at", { ascending: false });
+        setSession(currentSession);
 
-          data = fallbackResponse.data;
-          error = fallbackResponse.error;
-        }
-
-        if (isMissingMapColumn(error) || isMissingAreaColumn(error)) {
-          const fallbackResponse = await supabase
-            .from("properties")
-            .select(adminSelectBase)
-            .order("created_at", { ascending: false });
-
-          data = fallbackResponse.data;
-          error = fallbackResponse.error;
-        }
-
-        setSession(sessionData.session);
-
-        if (error) {
-          setSavedProperties(readStoredProperties());
-          setMessage(
-            "Supabase data se nepodařilo načíst. Dočasně zobrazuji lokální položky."
-          );
+        if (!currentSession) {
+          setSavedProperties([]);
+          setMessage("");
         } else {
-          setSavedProperties(data.map(fromSupabaseProperty));
+          const { properties, error } = await fetchAdminProperties(supabase);
+
+          if (error) {
+            setSavedProperties([]);
+            setMessage(
+              `Supabase data se nepodařilo načíst: ${getFriendlyErrorMessage(error)}`
+            );
+          } else {
+            setSavedProperties(properties);
+          }
         }
       } catch (error) {
-        setSavedProperties(readStoredProperties());
+        setSavedProperties([]);
         setMessage(`Supabase data se nepodařilo načíst: ${getFriendlyErrorMessage(error)}`);
+      } finally {
+        setIsLoading(false);
+        setIsAuthReady(true);
       }
-
-      setIsLoading(false);
     }
 
     loadAdminState();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, nextSession) => {
+      async (_event, nextSession) => {
         setSession(nextSession);
+
+        if (!nextSession) {
+          setSavedProperties([]);
+          setForm(emptyForm);
+          setEditingId(null);
+          setIsSlugManual(false);
+          return;
+        }
+
+        setIsLoading(true);
+        const { properties, error } = await fetchAdminProperties(supabase);
+        setIsLoading(false);
+
+        if (error) {
+          setSavedProperties([]);
+          setMessage(
+            `Supabase data se nepodařilo načíst: ${getFriendlyErrorMessage(error)}`
+          );
+        } else {
+          setSavedProperties(properties);
+        }
       }
     );
 
@@ -492,7 +519,7 @@ export default function AdminPropertyForm() {
     setIsSaving(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: authEmail,
         password: authPassword
       });
@@ -500,6 +527,21 @@ export default function AdminPropertyForm() {
       if (error) {
         setMessage(`Přihlášení se nepovedlo: ${error.message}`);
         return;
+      }
+
+      if (data.session) {
+        const { properties, error: propertiesError } =
+          await fetchAdminProperties(supabase);
+
+        if (propertiesError) {
+          setMessage(
+            `Přihlášení proběhlo, ale data se nepodařilo načíst: ${getFriendlyErrorMessage(propertiesError)}`
+          );
+          return;
+        }
+
+        setSavedProperties(properties);
+        setSession(data.session);
       }
 
       setAuthPassword("");
@@ -520,6 +562,10 @@ export default function AdminPropertyForm() {
 
     await supabase.auth.signOut();
     setSession(null);
+    setSavedProperties([]);
+    setForm(emptyForm);
+    setEditingId(null);
+    setIsSlugManual(false);
     setMessage("Správce je odhlášený.");
   }
 
@@ -745,6 +791,89 @@ export default function AdminPropertyForm() {
     URL.revokeObjectURL(url);
   }
 
+  if (!isAuthReady) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="rounded-lg border border-zinc-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-700">
+            Administrace
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-ink">
+            Ověřuji přihlášení
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-600">
+            Připravuji zabezpečený přístup do správy nemovitostí.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-10 sm:px-6 lg:px-8">
+        <form
+          onSubmit={handleLogin}
+          className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm"
+        >
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-700">
+            Administrace
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-ink">
+            Přihlášení správce
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-600">
+            Pro správu nemovitostí se přihlaste správcovským účtem.
+          </p>
+
+          <div className="mt-6 grid gap-4">
+            <Field label="E-mail">
+              <input
+                className={inputClass}
+                value={authEmail}
+                onChange={(event) => setAuthEmail(event.target.value)}
+                placeholder="admin@email.cz"
+                type="email"
+                disabled={!supabaseEnabled || isSaving}
+              />
+            </Field>
+            <Field label="Heslo">
+              <input
+                className={inputClass}
+                value={authPassword}
+                onChange={(event) => setAuthPassword(event.target.value)}
+                placeholder="Heslo"
+                type="password"
+                disabled={!supabaseEnabled || isSaving}
+              />
+            </Field>
+          </div>
+
+          {message ? (
+            <div className="mt-5 rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-900">
+              {message}
+            </div>
+          ) : null}
+
+          {!supabaseEnabled ? (
+            <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+              Přihlášení není dostupné. Chybí Supabase konfigurace v prostředí.
+            </div>
+          ) : null}
+
+          <button
+            type="submit"
+            disabled={!supabaseEnabled || isSaving}
+            className="focus-ring mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <LogIn className="h-4 w-4" aria-hidden="true" />
+            {isSaving ? "Přihlašuji..." : "Přihlásit se"}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_390px] lg:px-8">
       <form
@@ -784,58 +913,21 @@ export default function AdminPropertyForm() {
         <section className="mt-6 rounded-lg border border-zinc-200 bg-slate-50 p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-sm font-semibold text-ink">
-                {supabaseEnabled ? "Supabase režim" : "Lokální prototyp"}
-              </p>
+              <p className="text-sm font-semibold text-ink">Přihlášený správce</p>
               <p className="mt-1 text-sm leading-6 text-zinc-600">
-                {supabaseEnabled
-                  ? session
-                    ? `Přihlášeno jako ${session.user.email}. Nemovitosti se ukládají do databáze.`
-                    : "Supabase je nastavený. Pro ukládání a upload obrázků se přihlaste jako správce."
-                  : supabaseConfigIssue
-                    ? `${supabaseConfigIssue} Teď se používá localStorage a JSON export.`
-                    : "Doplňte .env.local pro ukládání do Supabase. Teď se používá localStorage a JSON export."}
+                Přihlášeno jako {session.user.email}. Nemovitosti se ukládají
+                do databáze.
               </p>
             </div>
 
-            {supabaseEnabled ? (
-              session ? (
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100"
-                >
-                  <LogOut className="h-4 w-4" aria-hidden="true" />
-                  Odhlásit
-                </button>
-              ) : (
-                <div className="grid gap-2 sm:grid-cols-[180px_180px_auto]">
-                  <input
-                    className={inputClass}
-                    value={authEmail}
-                    onChange={(event) => setAuthEmail(event.target.value)}
-                    placeholder="admin@email.cz"
-                    type="email"
-                  />
-                  <input
-                    className={inputClass}
-                    value={authPassword}
-                    onChange={(event) => setAuthPassword(event.target.value)}
-                    placeholder="Heslo"
-                    type="password"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleLogin}
-                    disabled={isSaving}
-                    className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <LogIn className="h-4 w-4" aria-hidden="true" />
-                    Přihlásit
-                  </button>
-                </div>
-              )
-            ) : null}
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              Odhlásit
+            </button>
           </div>
         </section>
 
