@@ -377,6 +377,7 @@ export default function AdminPropertyForm() {
   const [authPassword, setAuthPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const previewProperty = useMemo(() => formToProperty(form), [form]);
   const selectedFeatures = useMemo(() => splitLines(form.features), [form.features]);
@@ -553,17 +554,34 @@ export default function AdminPropertyForm() {
   async function handleSignOut() {
     const supabase = getSupabaseBrowserClient();
 
-    if (!supabase) {
-      return;
-    }
-
-    await supabase.auth.signOut();
+    setIsSigningOut(true);
+    setCopied(false);
     setSession(null);
     setSavedProperties([]);
     setForm(emptyForm);
     setEditingId(null);
     setIsSlugManual(false);
-    setMessage("Správce je odhlášený.");
+
+    if (!supabase) {
+      setMessage("Správce je odhlášený.");
+      setIsSigningOut(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        setMessage(`Odhlášení se nepovedlo: ${error.message}`);
+        return;
+      }
+
+      setMessage("Správce je odhlášený.");
+    } catch (error) {
+      setMessage(`Odhlášení se nepovedlo: ${getFriendlyErrorMessage(error)}`);
+    } finally {
+      setIsSigningOut(false);
+    }
   }
 
   async function handleMainImageUpload(event) {
@@ -902,10 +920,11 @@ export default function AdminPropertyForm() {
             <button
               type="button"
               onClick={handleSignOut}
-              className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100"
+              disabled={isSigningOut}
+              className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <LogOut className="h-4 w-4" aria-hidden="true" />
-              Odhlásit
+              {isSigningOut ? "Odhlašuji..." : "Odhlásit"}
             </button>
           </div>
         </section>
