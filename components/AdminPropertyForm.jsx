@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   Copy,
@@ -295,6 +295,24 @@ function getAdminErrorMessage(error) {
   return getFriendlyErrorMessage(error);
 }
 
+function getAuthErrorMessage(error) {
+  const message = error?.message ?? String(error);
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("invalid login credentials") ||
+    normalized.includes("invalid credentials")
+  ) {
+    return "Přihlášení se nepovedlo: zkontrolujte e-mail a heslo.";
+  }
+
+  if (normalized.includes("email not confirmed")) {
+    return "Přihlášení se nepovedlo: e-mail účtu není potvrzený v Supabase.";
+  }
+
+  return `Přihlášení se nepovedlo: ${getFriendlyErrorMessage(error)}`;
+}
+
 async function fetchAdminProperties(supabase) {
   let { data, error } = await supabase
     .from("properties")
@@ -432,6 +450,9 @@ export default function AdminPropertyForm() {
   const [authPassword, setAuthPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAuthBusy, setIsAuthBusy] = useState(false);
+  const authFlowIdRef = useRef(0);
+  const isAuthBusyRef = useRef(false);
 
   const previewProperty = useMemo(() => formToProperty(form), [form]);
   const selectedFeatures = useMemo(() => splitLines(form.features), [form.features]);
@@ -440,7 +461,12 @@ export default function AdminPropertyForm() {
     [savedProperties]
   );
 
-  async function refreshAdminAccess(currentSession) {
+  function setAuthBusy(value) {
+    isAuthBusyRef.current = value;
+    setIsAuthBusy(value);
+  }
+
+  async function refreshAdminAccess(currentSession, flowId = authFlowIdRef.current) {
     const supabase = getSupabaseBrowserClient();
 
     if (!supabase || !currentSession) {
@@ -449,10 +475,18 @@ export default function AdminPropertyForm() {
     }
 
     const warning = await checkAdminMembership(supabase, currentSession);
+
+    if (flowId !== authFlowIdRef.current) {
+      return;
+    }
+
     setAdminAccessWarning(warning);
   }
 
-  async function refreshAdminProperties({ fallbackToLocal = true } = {}) {
+  async function refreshAdminProperties({
+    fallbackToLocal = true,
+    flowId = authFlowIdRef.current
+  } = {}) {
     const supabase = getSupabaseBrowserClient();
 
     if (!supabase) {
@@ -465,6 +499,10 @@ export default function AdminPropertyForm() {
     try {
       const { properties, error } = await fetchAdminProperties(supabase);
 
+      if (flowId !== authFlowIdRef.current) {
+        return false;
+      }
+
       if (error) {
         setSavedProperties(fallbackToLocal ? readStoredProperties() : []);
         setMessage(
@@ -476,11 +514,17 @@ export default function AdminPropertyForm() {
       setSavedProperties(properties);
       return true;
     } catch (error) {
+      if (flowId !== authFlowIdRef.current) {
+        return false;
+      }
+
       setSavedProperties(fallbackToLocal ? readStoredProperties() : []);
       setMessage(`Supabase data se nepodařilo načíst: ${getAdminErrorMessage(error)}`);
       return false;
     } finally {
-      setIsLoading(false);
+      if (flowId === authFlowIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -493,13 +537,22 @@ export default function AdminPropertyForm() {
     }
 
     async function loadAdminState() {
+      const flowId = authFlowIdRef.current;
+
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         setSession(sessionData.session);
-        await refreshAdminAccess(sessionData.session);
-        await refreshAdminProperties();
+
+        if (!sessionData.session) {
+          setSavedProperties([]);
+          setAdminAccessWarning("");
+          return;
+        }
+
+        await refreshAdminAccess(sessionData.session, flowId);
+        await refreshAdminProperties({ fallbackToLocal: false, flowId });
       } catch (error) {
-        setSavedProperties(readStoredProperties());
+        setSavedProperties([]);
         setMessage(`Supabase data se nepodařilo načíst: ${getAdminErrorMessage(error)}`);
       }
     }
@@ -508,9 +561,21 @@ export default function AdminPropertyForm() {
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event, nextSession) => {
+        if (isAuthBusyRef.current) {
+          return;
+        }
+
+        const flowId = authFlowIdRef.current;
         setSession(nextSession);
-        await refreshAdminAccess(nextSession);
-        await refreshAdminProperties({ fallbackToLocal: !nextSession });
+
+        if (!nextSession) {
+          setSavedProperties([]);
+          setAdminAccessWarning("");
+          return;
+        }
+
+        await refreshAdminAccess(nextSession, flowId);
+        await refreshAdminProperties({ fallbackToLocal: false, flowId });
       }
     );
 
@@ -563,8 +628,21 @@ export default function AdminPropertyForm() {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProperties));
   }
 
-  async function handleLogin(event) {
+  function handleLoginKeyDown(event) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
     event.preventDefault();
+    handleLogin(event);
+  }
+
+  async function handleLogin(event) {
+    event?.preventDefault();
+
+    if (isAuthBusy) {
+      return;
+    }
 
     const supabase = getSupabaseBrowserClient();
 
@@ -573,46 +651,101 @@ export default function AdminPropertyForm() {
       return;
     }
 
-    setIsSaving(true);
+    const flowId = authFlowIdRef.current + 1;
+    authFlowIdRef.current = flowId;
+    setAuthBusy(true);
+    setMessage("");
+    setAdminAccessWarning("");
+    setSavedProperties([]);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: authEmail,
+        email: authEmail.trim(),
         password: authPassword
       });
 
       if (error) {
-        setMessage(`Přihlášení se nepovedlo: ${error.message}`);
+        if (flowId === authFlowIdRef.current) {
+          setMessage(getAuthErrorMessage(error));
+        }
+        return;
+      }
+
+      if (flowId !== authFlowIdRef.current) {
         return;
       }
 
       if (data.session) {
         setSession(data.session);
-        await refreshAdminAccess(data.session);
-        await refreshAdminProperties({ fallbackToLocal: false });
+        await refreshAdminAccess(data.session, flowId);
+        const propertiesLoaded = await refreshAdminProperties({
+          fallbackToLocal: false,
+          flowId
+        });
+
+        if (!propertiesLoaded) {
+          setAuthPassword("");
+          return;
+        }
       }
 
       setAuthPassword("");
       setMessage("Správce je přihlášený a data byla znovu načtena.");
     } catch (error) {
-      setMessage(`Přihlášení se nepovedlo: ${getFriendlyErrorMessage(error)}`);
+      if (flowId === authFlowIdRef.current) {
+        setMessage(getAuthErrorMessage(error));
+      }
     } finally {
-      setIsSaving(false);
+      if (flowId === authFlowIdRef.current) {
+        setAuthBusy(false);
+      }
     }
   }
 
   async function handleSignOut() {
+    if (isAuthBusy) {
+      return;
+    }
+
     const supabase = getSupabaseBrowserClient();
 
     if (!supabase) {
       return;
     }
 
-    await supabase.auth.signOut();
+    const flowId = authFlowIdRef.current + 1;
+    authFlowIdRef.current = flowId;
+    setAuthBusy(true);
+    setMessage("Odhlašuji správce...");
     setSession(null);
     setAdminAccessWarning("");
-    await refreshAdminProperties();
-    setMessage("Správce je odhlášený.");
+    setSavedProperties([]);
+    setForm(emptyForm);
+    setEditingId(null);
+    setIsSlugManual(false);
+
+    try {
+      const { error } = await supabase.auth.signOut();
+
+      if (flowId !== authFlowIdRef.current) {
+        return;
+      }
+
+      if (error) {
+        setMessage(`Odhlášení se nepovedlo: ${getFriendlyErrorMessage(error)}`);
+        return;
+      }
+
+      setMessage("Správce je odhlášený.");
+    } catch (error) {
+      if (flowId === authFlowIdRef.current) {
+        setMessage(`Odhlášení se nepovedlo: ${getFriendlyErrorMessage(error)}`);
+      }
+    } finally {
+      if (flowId === authFlowIdRef.current) {
+        setAuthBusy(false);
+      }
+    }
   }
 
   async function handleMainImageUpload(event) {
@@ -911,10 +1044,11 @@ export default function AdminPropertyForm() {
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100"
+                  disabled={isAuthBusy}
+                  className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <LogOut className="h-4 w-4" aria-hidden="true" />
-                  Odhlásit
+                  {isAuthBusy ? "Odhlašuji..." : "Odhlásit"}
                 </button>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-[180px_180px_auto]">
@@ -922,24 +1056,28 @@ export default function AdminPropertyForm() {
                     className={inputClass}
                     value={authEmail}
                     onChange={(event) => setAuthEmail(event.target.value)}
+                    onKeyDown={handleLoginKeyDown}
                     placeholder="admin@email.cz"
                     type="email"
+                    disabled={isAuthBusy}
                   />
                   <input
                     className={inputClass}
                     value={authPassword}
                     onChange={(event) => setAuthPassword(event.target.value)}
+                    onKeyDown={handleLoginKeyDown}
                     placeholder="Heslo"
                     type="password"
+                    disabled={isAuthBusy}
                   />
                   <button
                     type="button"
                     onClick={handleLogin}
-                    disabled={isSaving}
+                    disabled={isAuthBusy}
                     className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <LogIn className="h-4 w-4" aria-hidden="true" />
-                    Přihlásit
+                    {isAuthBusy ? "Přihlašuji..." : "Přihlásit"}
                   </button>
                 </div>
               )
