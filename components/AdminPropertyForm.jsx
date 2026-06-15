@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
-  Copy,
-  Download,
   ImagePlus,
   LogIn,
   LogOut,
@@ -444,7 +442,6 @@ export default function AdminPropertyForm() {
   const [isSlugManual, setIsSlugManual] = useState(false);
   const [message, setMessage] = useState("");
   const [adminAccessWarning, setAdminAccessWarning] = useState("");
-  const [copied, setCopied] = useState(false);
   const [session, setSession] = useState(null);
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -456,11 +453,6 @@ export default function AdminPropertyForm() {
 
   const previewProperty = useMemo(() => formToProperty(form), [form]);
   const selectedFeatures = useMemo(() => splitLines(form.features), [form.features]);
-  const exportJson = useMemo(
-    () => JSON.stringify(savedProperties, null, 2),
-    [savedProperties]
-  );
-
   function setAuthBusy(value) {
     isAuthBusyRef.current = value;
     setIsAuthBusy(value);
@@ -583,7 +575,6 @@ export default function AdminPropertyForm() {
   }, []);
 
   function updateField(field, value) {
-    setCopied(false);
     setMessage("");
     setForm((current) => ({
       ...current,
@@ -592,7 +583,6 @@ export default function AdminPropertyForm() {
   }
 
   function handleTitleChange(value) {
-    setCopied(false);
     setMessage("");
     setForm((current) => ({
       ...current,
@@ -608,7 +598,6 @@ export default function AdminPropertyForm() {
   }
 
   function toggleFeature(feature) {
-    setCopied(false);
     setMessage("");
     setForm((current) => {
       const currentFeatures = splitLines(current.features);
@@ -916,7 +905,6 @@ export default function AdminPropertyForm() {
     setEditingId(property.id);
     setIsSlugManual(true);
     setMessage("");
-    setCopied(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -954,31 +942,6 @@ export default function AdminPropertyForm() {
       setEditingId(null);
       setIsSlugManual(false);
     }
-  }
-
-  async function handleCopy() {
-    const text = exportJson || "[]";
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setMessage("JSON je zkopírovaný do schránky.");
-    } catch {
-      setCopied(false);
-      setMessage("Kopírování se nepovedlo. JSON můžete označit ručně níže.");
-    }
-  }
-
-  function handleDownload() {
-    const blob = new Blob([exportJson || "[]"], {
-      type: "application/json"
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "smar-nemovitosti.json";
-    link.click();
-    URL.revokeObjectURL(url);
   }
 
   return (
@@ -1457,39 +1420,6 @@ export default function AdminPropertyForm() {
               </p>
             )}
           </div>
-        </section>
-
-        <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl font-semibold text-ink">Export JSON</h2>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="focus-ring inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-200"
-              >
-                {copied ? (
-                  <Check className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <Copy className="h-4 w-4" aria-hidden="true" />
-                )}
-                Kopírovat
-              </button>
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="focus-ring inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-200"
-              >
-                <Download className="h-4 w-4" aria-hidden="true" />
-                Stáhnout
-              </button>
-            </div>
-          </div>
-          <textarea
-            readOnly
-            value={exportJson || "[]"}
-            className="mt-4 h-56 w-full rounded-lg border border-zinc-200 bg-zinc-950 p-3 font-mono text-xs leading-5 text-zinc-100"
-          />
         </section>
       </aside>
     </div>
