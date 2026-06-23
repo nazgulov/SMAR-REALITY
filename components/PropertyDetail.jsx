@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import MatterportEmbed from "@/components/MatterportEmbed";
 import MapEmbed from "@/components/MapEmbed";
+import PropertyGallery from "@/components/PropertyGallery";
 import VideoEmbed from "@/components/VideoEmbed";
 import { propertyTypeLabels } from "@/data/properties";
 import { formatPropertyDate, getAreaItems } from "@/lib/property-display";
@@ -111,25 +112,7 @@ export default function PropertyDetail({ property }) {
             </p>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-ink">Fotogalerie</h2>
-            <div className="mt-5 grid gap-4 sm:grid-cols-3">
-              {property.gallery.map((image, index) => (
-                <div
-                  key={image}
-                  className="relative aspect-[4/3] overflow-hidden rounded-lg bg-zinc-200"
-                >
-                  <Image
-                    src={image}
-                    alt={`${property.title} - galerie ${index + 1}`}
-                    fill
-                    className="object-cover"
-                    sizes="(min-width: 1024px) 28vw, (min-width: 640px) 33vw, 100vw"
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
+          <PropertyGallery images={property.gallery} title={property.title} />
 
           {property.floorPlan ? (
             <section>
