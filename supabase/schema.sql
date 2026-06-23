@@ -15,6 +15,7 @@ create table if not exists public.properties (
   description text not null,
   image text not null,
   gallery text[] not null default '{}',
+  floor_plan text not null default '',
   matterport_url text not null default '',
   video_url text not null default '',
   map_url text not null default '',

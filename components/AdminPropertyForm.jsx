@@ -32,8 +32,12 @@ const STORAGE_KEY = "smar-admin-properties";
 const supabaseConfigIssue = getSupabaseConfigIssue();
 const supabaseEnabled = hasSupabaseConfig();
 const adminSelect =
-  "id,title,type,price,location,size,plot_area,usable_area,built_up_area,layout,short_description,description,image,gallery,matterport_url,video_url,map_url,features,published,created_at";
+  "id,title,type,price,location,size,plot_area,usable_area,built_up_area,layout,short_description,description,image,gallery,floor_plan,matterport_url,video_url,map_url,features,published,created_at";
 const adminSelectWithoutVideo =
+  "id,title,type,price,location,size,plot_area,usable_area,built_up_area,layout,short_description,description,image,gallery,floor_plan,matterport_url,map_url,features,published,created_at";
+const adminSelectWithoutFloorPlan =
+  "id,title,type,price,location,size,plot_area,usable_area,built_up_area,layout,short_description,description,image,gallery,matterport_url,map_url,features,published,created_at";
+const adminSelectWithoutVideoAndFloorPlan =
   "id,title,type,price,location,size,plot_area,usable_area,built_up_area,layout,short_description,description,image,gallery,matterport_url,map_url,features,published,created_at";
 const adminSelectBase =
   "id,title,type,price,location,size,layout,short_description,description,image,gallery,matterport_url,features,published,created_at";
@@ -53,6 +57,7 @@ const emptyForm = {
   description: "",
   image: "",
   gallery: "",
+  floorPlan: "",
   matterportUrl: "",
   videoUrl: "",
   mapUrl: "",
@@ -195,6 +200,7 @@ function propertyToForm(property) {
     builtUpArea: property.builtUpArea ?? "",
     size: property.size || usableArea,
     gallery: property.gallery.join("\n"),
+    floorPlan: property.floorPlan ?? "",
     mapUrl: property.mapUrl ?? "",
     videoUrl: property.videoUrl ?? "",
     features: uniqueItems(property.features ?? []).join("\n")
@@ -223,6 +229,7 @@ function formToProperty(form) {
     description: form.description.trim(),
     image,
     gallery: splitLines(form.gallery).length ? splitLines(form.gallery) : [image],
+    floorPlan: form.floorPlan.trim(),
     matterportUrl: form.matterportUrl.trim(),
     videoUrl: normalizeVideoInput(form.videoUrl),
     mapUrl: normalizeMapInput(form.mapUrl),
@@ -265,6 +272,10 @@ function isMissingMapColumn(error) {
 
 function isMissingVideoColumn(error) {
   return error?.message?.includes("video_url");
+}
+
+function isMissingFloorPlanColumn(error) {
+  return error?.message?.includes("floor_plan");
 }
 
 function isMissingAreaColumn(error) {
@@ -317,10 +328,30 @@ async function fetchAdminProperties(supabase) {
     .select(adminSelect)
     .order("created_at", { ascending: false });
 
+  if (isMissingFloorPlanColumn(error)) {
+    const fallbackResponse = await supabase
+      .from("properties")
+      .select(adminSelectWithoutFloorPlan)
+      .order("created_at", { ascending: false });
+
+    data = fallbackResponse.data;
+    error = fallbackResponse.error;
+  }
+
   if (isMissingVideoColumn(error)) {
     const fallbackResponse = await supabase
       .from("properties")
       .select(adminSelectWithoutVideo)
+      .order("created_at", { ascending: false });
+
+    data = fallbackResponse.data;
+    error = fallbackResponse.error;
+  }
+
+  if (isMissingFloorPlanColumn(error)) {
+    const fallbackResponse = await supabase
+      .from("properties")
+      .select(adminSelectWithoutVideoAndFloorPlan)
       .order("created_at", { ascending: false });
 
     data = fallbackResponse.data;
@@ -789,6 +820,37 @@ export default function AdminPropertyForm() {
     }
   }
 
+  async function handleFloorPlanUpload(event) {
+    const [file] = Array.from(event.target.files ?? []);
+
+    if (!file) {
+      return;
+    }
+
+    if (file.type !== "image/png") {
+      setMessage("Půdorys musí být ve formátu PNG.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      const floorPlanUrl =
+        supabaseEnabled && session
+          ? await uploadFileToStorage(file)
+          : await readFileAsDataUrl(file);
+      updateField("floorPlan", floorPlanUrl);
+      setMessage(
+        supabaseEnabled && session
+          ? "Půdorys byl nahraný do Supabase Storage."
+          : "Půdorys byl načtený lokálně do prohlížeče."
+      );
+    } catch {
+      setMessage("Půdorys se nepodařilo načíst.");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
   async function handleVideoUpload(event) {
     const [file] = Array.from(event.target.files ?? []);
 
@@ -858,6 +920,13 @@ export default function AdminPropertyForm() {
         if (isMissingVideoColumn(error)) {
           setMessage(
             "Uložení se nepovedlo: v Supabase chybí sloupec video_url. Spusťte SQL soubor supabase/add-property-video-url.sql."
+          );
+          return;
+        }
+
+        if (isMissingFloorPlanColumn(error)) {
+          setMessage(
+            "Uložení se nepovedlo: v Supabase chybí sloupec floor_plan. Spusťte SQL soubor supabase/add-property-floor-plan.sql."
           );
           return;
         }
@@ -1211,6 +1280,47 @@ export default function AdminPropertyForm() {
                   className="sr-only"
                 />
               </label>
+            </div>
+          </Field>
+
+          <Field label="Půdorys (PNG)" asDiv>
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_auto]">
+                <input
+                  className={inputClass}
+                  value={form.floorPlan}
+                  onChange={(event) => updateField("floorPlan", event.target.value)}
+                  placeholder="URL se doplní po nahrání PNG z PC"
+                />
+                <label className="focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100">
+                  <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                  Nahrát PNG
+                  <input
+                    type="file"
+                    accept="image/png"
+                    onChange={handleFloorPlanUpload}
+                    className="sr-only"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => updateField("floorPlan", "")}
+                  disabled={!form.floorPlan}
+                  className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  Odebrat
+                </button>
+              </div>
+              {form.floorPlan ? (
+                <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+                  <img
+                    src={form.floorPlan}
+                    alt="Náhled půdorysu"
+                    className="max-h-80 w-full object-contain"
+                  />
+                </div>
+              ) : null}
             </div>
           </Field>
 

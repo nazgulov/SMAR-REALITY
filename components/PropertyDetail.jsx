@@ -131,6 +131,23 @@ export default function PropertyDetail({ property }) {
             </div>
           </section>
 
+          {property.floorPlan ? (
+            <section>
+              <h2 className="text-2xl font-semibold text-ink">Půdorys</h2>
+              <div className="mt-5 overflow-hidden rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+                <div className="relative aspect-[4/3] bg-zinc-50">
+                  <Image
+                    src={property.floorPlan}
+                    alt={`Půdorys - ${property.title}`}
+                    fill
+                    className="object-contain"
+                    sizes="(min-width: 1024px) 62vw, 100vw"
+                  />
+                </div>
+              </div>
+            </section>
+          ) : null}
+
           <MapEmbed
             mapUrl={property.mapUrl}
             location={property.location}
