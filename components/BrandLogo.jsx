@@ -1,6 +1,4 @@
 export default function BrandLogo({ compact = false }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-
   return (
     <span
       className={`flex items-center rounded-lg bg-white ${
@@ -8,7 +6,7 @@ export default function BrandLogo({ compact = false }) {
       }`}
     >
       <img
-        src={`${basePath}/smar-reality-logo.png`}
+        src="/smar-reality-logo.png"
         alt="SMAR Reality"
         className="h-full w-full object-contain"
       />

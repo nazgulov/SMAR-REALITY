@@ -64,27 +64,14 @@ Administrace je na `/admin/nemovitosti`. Bez přihlášení umí lokální proto
 export JSON. Po přihlášení admin účtem ukládá nemovitosti do Supabase a nahrává
 obrázky do Storage bucketu `property-images`.
 
-Pozor: GitHub Pages je statický hosting. Pro skutečně dynamické načítání nových
-nemovitostí bez rebuild/deploy doporučujeme nasadit projekt na Vercel.
+## Produkční hosting
 
-## Publikace na GitHub Pages
-
-Projekt je připravený pro GitHub Pages bez vlastní domény. Po pushi do větve
-`main` se spustí workflow `.github/workflows/deploy-pages.yml` a web se
-publikuje na:
+Produkční web běží na Vercelu, aby mohl dynamicky načítat aktuální nemovitosti
+ze Supabase bez statického exportu. Standardní produkční build je:
 
 ```bash
-https://nazgulov.github.io/SMAR-REALITY/
+npm run build
 ```
-
-Lokální kontrola statického exportu pro GitHub Pages:
-
-```bash
-npm run build:pages
-```
-
-Statické soubory pro GitHub Pages se při tomto buildu vytvoří ve složce
-`pages-out`.
 
 ## Přidání nové nemovitosti do mock dat
 

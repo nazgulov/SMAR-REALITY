@@ -12,7 +12,7 @@ Tento soubor slouzi jako rychla pamet projektu pro navazani prace po znovuotevre
 - Hlavni vetev: `main`
 - Lokalni URL pri vyvoji: http://localhost:3000
 - Aktivni hosting pro dynamicky web: Vercel
-- GitHub Pages workflow v projektu stale existuje, ale pro Supabase provoz je vhodny Vercel. GitHub Pages je staticky export a neni vhodny pro zive nacitani novych nemovitosti bez buildu/deploye.
+- GitHub Pages deploy byl z projektu odstranen. Produkcni provoz bezi pres Vercel.
 
 ## Technologie
 
@@ -29,7 +29,6 @@ npm install
 npm run dev
 npm run build
 npm run start
-npm run build:pages
 ```
 
 ## Prostredi
@@ -50,7 +49,7 @@ Stejne promenne musi byt nastavene i ve Vercelu pro Production a Preview.
 
 Verejny web nacita nemovitosti pres `lib/properties.js`.
 
-- Pokud je dostupna Supabase konfigurace a nejde o GitHub Pages build, data se nacitaji ze Supabase tabulky `public.properties`.
+- Pokud je dostupna Supabase konfigurace, data se nacitaji ze Supabase tabulky `public.properties`.
 - Pokud Supabase neni nastavena nebo dotaz selze, web pouzije fallback mock data z `data/properties.js`.
 - Produkcni Vercel web je dynamicky a pouziva `unstable_noStore`, aby se zmeny ze Supabase propsaly bez rebuild deploye.
 
