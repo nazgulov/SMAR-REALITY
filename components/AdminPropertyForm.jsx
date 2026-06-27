@@ -65,6 +65,13 @@ const emptyForm = {
   createdAt: ""
 };
 
+const emptyUploadMessages = {
+  image: "",
+  gallery: "",
+  floorPlan: "",
+  video: ""
+};
+
 const sampleImage =
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80";
 
@@ -466,8 +473,52 @@ function AreaInput({ value, onChange, placeholder }) {
 const textareaClass =
   "focus-ring min-h-28 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm leading-6 text-ink shadow-sm transition placeholder:text-zinc-400";
 
+function FileUploadButton({
+  accept,
+  icon: Icon,
+  label,
+  multiple = false,
+  onChange
+}) {
+  return (
+    <span className="focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 relative inline-flex cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100">
+      <Icon className="h-4 w-4" aria-hidden="true" />
+      {label}
+      <input
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        onChange={onChange}
+        aria-label={label}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+    </span>
+  );
+}
+
+function UploadStatus({ message }) {
+  if (!message) {
+    return null;
+  }
+
+  const isError =
+    message.toLowerCase().includes("nepodařilo") ||
+    message.toLowerCase().includes("musí");
+
+  return (
+    <p
+      className={`text-sm font-medium ${
+        isError ? "text-red-700" : "text-brand-800"
+      }`}
+    >
+      {message}
+    </p>
+  );
+}
+
 export default function AdminPropertyForm() {
   const [form, setForm] = useState(emptyForm);
+  const [uploadMessages, setUploadMessages] = useState(emptyUploadMessages);
   const [savedProperties, setSavedProperties] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [isSlugManual, setIsSlugManual] = useState(false);
@@ -613,6 +664,17 @@ export default function AdminPropertyForm() {
     }));
   }
 
+  function updateUploadMessage(field, value) {
+    setUploadMessages((current) => ({
+      ...current,
+      [field]: value
+    }));
+  }
+
+  function resetUploadMessages() {
+    setUploadMessages(emptyUploadMessages);
+  }
+
   function handleTitleChange(value) {
     setMessage("");
     setForm((current) => ({
@@ -741,6 +803,7 @@ export default function AdminPropertyForm() {
     setAdminAccessWarning("");
     setSavedProperties([]);
     setForm(emptyForm);
+    resetUploadMessages();
     setEditingId(null);
     setIsSlugManual(false);
 
@@ -775,19 +838,24 @@ export default function AdminPropertyForm() {
       return;
     }
 
+    updateUploadMessage("image", "Nahrávám hlavní obrázek...");
+
     try {
       const imageUrl =
         supabaseEnabled && session
           ? await uploadFileToStorage(file)
           : await readFileAsDataUrl(file);
       updateField("image", imageUrl);
-      setMessage(
+      const successMessage =
         supabaseEnabled && session
           ? "Hlavní obrázek byl nahraný do Supabase Storage."
-          : "Hlavní obrázek byl načtený lokálně do prohlížeče."
-      );
-    } catch {
-      setMessage("Obrázek se nepodařilo načíst.");
+          : "Hlavní obrázek byl načtený lokálně do prohlížeče.";
+      updateUploadMessage("image", successMessage);
+      setMessage(successMessage);
+    } catch (error) {
+      const errorMessage = `Obrázek se nepodařilo načíst: ${getAdminErrorMessage(error)}`;
+      updateUploadMessage("image", errorMessage);
+      setMessage(errorMessage);
     } finally {
       event.target.value = "";
     }
@@ -800,6 +868,8 @@ export default function AdminPropertyForm() {
       return;
     }
 
+    updateUploadMessage("gallery", "Nahrávám obrázky galerie...");
+
     try {
       const imageUrls = await Promise.all(
         files.map((file) =>
@@ -808,13 +878,16 @@ export default function AdminPropertyForm() {
       );
       const currentGallery = splitLines(form.gallery);
       updateField("gallery", [...currentGallery, ...imageUrls].join("\n"));
-      setMessage(
+      const successMessage =
         supabaseEnabled && session
           ? "Obrázky galerie byly nahrané do Supabase Storage."
-          : "Obrázky galerie byly načtené lokálně do prohlížeče."
-      );
-    } catch {
-      setMessage("Některý obrázek galerie se nepodařilo načíst.");
+          : "Obrázky galerie byly načtené lokálně do prohlížeče.";
+      updateUploadMessage("gallery", successMessage);
+      setMessage(successMessage);
+    } catch (error) {
+      const errorMessage = `Některý obrázek galerie se nepodařilo načíst: ${getAdminErrorMessage(error)}`;
+      updateUploadMessage("gallery", errorMessage);
+      setMessage(errorMessage);
     } finally {
       event.target.value = "";
     }
@@ -828,10 +901,14 @@ export default function AdminPropertyForm() {
     }
 
     if (file.type !== "image/png") {
-      setMessage("Půdorys musí být ve formátu PNG.");
+      const errorMessage = "Půdorys musí být ve formátu PNG.";
+      updateUploadMessage("floorPlan", errorMessage);
+      setMessage(errorMessage);
       event.target.value = "";
       return;
     }
+
+    updateUploadMessage("floorPlan", "Nahrávám půdorys...");
 
     try {
       const floorPlanUrl =
@@ -839,13 +916,16 @@ export default function AdminPropertyForm() {
           ? await uploadFileToStorage(file)
           : await readFileAsDataUrl(file);
       updateField("floorPlan", floorPlanUrl);
-      setMessage(
+      const successMessage =
         supabaseEnabled && session
           ? "Půdorys byl nahraný do Supabase Storage."
-          : "Půdorys byl načtený lokálně do prohlížeče."
-      );
-    } catch {
-      setMessage("Půdorys se nepodařilo načíst.");
+          : "Půdorys byl načtený lokálně do prohlížeče.";
+      updateUploadMessage("floorPlan", successMessage);
+      setMessage(successMessage);
+    } catch (error) {
+      const errorMessage = `Půdorys se nepodařilo načíst: ${getAdminErrorMessage(error)}`;
+      updateUploadMessage("floorPlan", errorMessage);
+      setMessage(errorMessage);
     } finally {
       event.target.value = "";
     }
@@ -858,19 +938,24 @@ export default function AdminPropertyForm() {
       return;
     }
 
+    updateUploadMessage("video", "Nahrávám video...");
+
     try {
       const videoUrl =
         supabaseEnabled && session
           ? await uploadFileToStorage(file)
           : await readFileAsDataUrl(file);
       updateField("videoUrl", videoUrl);
-      setMessage(
+      const successMessage =
         supabaseEnabled && session
           ? "Video bylo nahrané do Supabase Storage."
-          : "Video bylo načtené lokálně do prohlížeče."
-      );
-    } catch {
-      setMessage("Video se nepodařilo načíst.");
+          : "Video bylo načtené lokálně do prohlížeče.";
+      updateUploadMessage("video", successMessage);
+      setMessage(successMessage);
+    } catch (error) {
+      const errorMessage = `Video se nepodařilo načíst: ${getAdminErrorMessage(error)}`;
+      updateUploadMessage("video", errorMessage);
+      setMessage(errorMessage);
     } finally {
       event.target.value = "";
     }
@@ -948,6 +1033,7 @@ export default function AdminPropertyForm() {
       setSavedProperties([...withoutCurrent, property]);
       await refreshAdminProperties({ fallbackToLocal: false });
       setForm(emptyForm);
+      resetUploadMessages();
       setEditingId(null);
       setIsSlugManual(false);
       setMessage(
@@ -964,6 +1050,7 @@ export default function AdminPropertyForm() {
     persistLocal([...withoutCurrent, property]);
     setIsSaving(false);
     setForm(emptyForm);
+    resetUploadMessages();
     setEditingId(null);
     setIsSlugManual(false);
     setMessage(editingId ? "Nemovitost byla upravena." : "Nemovitost byla uložena.");
@@ -971,6 +1058,7 @@ export default function AdminPropertyForm() {
 
   function handleEdit(property) {
     setForm(propertyToForm(property));
+    resetUploadMessages();
     setEditingId(property.id);
     setIsSlugManual(true);
     setMessage("");
@@ -997,6 +1085,7 @@ export default function AdminPropertyForm() {
 
       if (editingId === id) {
         setForm(emptyForm);
+        resetUploadMessages();
         setEditingId(null);
         setIsSlugManual(false);
       }
@@ -1008,6 +1097,7 @@ export default function AdminPropertyForm() {
 
     if (editingId === id) {
       setForm(emptyForm);
+      resetUploadMessages();
       setEditingId(null);
       setIsSlugManual(false);
     }
@@ -1038,6 +1128,7 @@ export default function AdminPropertyForm() {
             type="button"
             onClick={() => {
               setForm(emptyForm);
+              resetUploadMessages();
               setEditingId(null);
               setIsSlugManual(false);
               setMessage("");
@@ -1223,17 +1314,14 @@ export default function AdminPropertyForm() {
                   onChange={(event) => updateField("image", event.target.value)}
                   placeholder="https://images.unsplash.com/... nebo data:image/..."
                 />
-                <label className="focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100">
-                  <ImagePlus className="h-4 w-4" aria-hidden="true" />
-                  Nahrát z PC
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleMainImageUpload}
-                    className="sr-only"
-                  />
-                </label>
+                <FileUploadButton
+                  accept="image/*"
+                  icon={ImagePlus}
+                  label="Nahrát z PC"
+                  onChange={handleMainImageUpload}
+                />
               </div>
+              <UploadStatus message={uploadMessages.image} />
             </Field>
           </div>
         </div>
@@ -1269,17 +1357,14 @@ export default function AdminPropertyForm() {
                   "https://images.unsplash.com/...\nhttps://images.unsplash.com/..."
                 }
               />
-              <label className="focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100">
-                <ImagePlus className="h-4 w-4" aria-hidden="true" />
-                Nahrát obrázky z PC
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleGalleryUpload}
-                  className="sr-only"
-                />
-              </label>
+              <FileUploadButton
+                accept="image/*"
+                icon={ImagePlus}
+                label="Nahrát obrázky z PC"
+                multiple
+                onChange={handleGalleryUpload}
+              />
+              <UploadStatus message={uploadMessages.gallery} />
             </div>
           </Field>
 
@@ -1292,16 +1377,12 @@ export default function AdminPropertyForm() {
                   onChange={(event) => updateField("floorPlan", event.target.value)}
                   placeholder="URL se doplní po nahrání PNG z PC"
                 />
-                <label className="focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100">
-                  <ImagePlus className="h-4 w-4" aria-hidden="true" />
-                  Nahrát PNG
-                  <input
-                    type="file"
-                    accept="image/png"
-                    onChange={handleFloorPlanUpload}
-                    className="sr-only"
-                  />
-                </label>
+                <FileUploadButton
+                  accept="image/png"
+                  icon={ImagePlus}
+                  label="Nahrát PNG"
+                  onChange={handleFloorPlanUpload}
+                />
                 <button
                   type="button"
                   onClick={() => updateField("floorPlan", "")}
@@ -1321,6 +1402,7 @@ export default function AdminPropertyForm() {
                   />
                 </div>
               ) : null}
+              <UploadStatus message={uploadMessages.floorPlan} />
             </div>
           </Field>
 
@@ -1335,7 +1417,7 @@ export default function AdminPropertyForm() {
             />
           </Field>
 
-          <Field label="Video URL">
+          <Field label="Video URL" asDiv>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
               <input
                 className={inputClass}
@@ -1343,17 +1425,14 @@ export default function AdminPropertyForm() {
                 onChange={(event) => updateField("videoUrl", event.target.value)}
                 placeholder="YouTube, Vimeo, přímé MP4/WebM video nebo iframe src"
               />
-              <label className="focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100">
-                <PlayCircle className="h-4 w-4" aria-hidden="true" />
-                Nahrát video z PC
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={handleVideoUpload}
-                  className="sr-only"
-                />
-              </label>
+              <FileUploadButton
+                accept="video/*"
+                icon={PlayCircle}
+                label="Nahrát video z PC"
+                onChange={handleVideoUpload}
+              />
             </div>
+            <UploadStatus message={uploadMessages.video} />
           </Field>
 
           <Field label="Hlavní vlastnosti" asDiv>
