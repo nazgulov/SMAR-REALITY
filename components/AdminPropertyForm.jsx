@@ -29,6 +29,7 @@ import { formatPropertyDate, getAreaItems } from "@/lib/property-display";
 import { normalizeVideoInput } from "@/lib/video-utils";
 
 const STORAGE_KEY = "smar-admin-properties";
+const SAVE_TIMEOUT_MS = 30000;
 const supabaseConfigIssue = getSupabaseConfigIssue();
 const supabaseEnabled = hasSupabaseConfig();
 const adminSelect =
@@ -260,6 +261,17 @@ function readFileAsDataUrl(file) {
     reader.onload = () => resolve(reader.result);
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
+  });
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    window.clearTimeout(timeoutId);
   });
 }
 
@@ -986,74 +998,81 @@ export default function AdminPropertyForm() {
 
     setIsSaving(true);
 
-    if (supabaseEnabled) {
-      const supabase = getSupabaseBrowserClient();
+    try {
+      if (supabaseEnabled) {
+        const supabase = getSupabaseBrowserClient();
 
-      if (!session) {
-        setMessage("Pro uložení do Supabase se nejdřív přihlaste jako správce.");
+        if (!session) {
+          setMessage("Pro uložení do Supabase se nejdřív přihlaste jako správce.");
+          return;
+        }
+
+        const { error } = await withTimeout(
+          supabase
+            .from("properties")
+            .upsert(toSupabaseProperty(property), { onConflict: "id" }),
+          SAVE_TIMEOUT_MS,
+          "Uložení trvá příliš dlouho. Zkontrolujte připojení k Supabase a zkuste to znovu."
+        );
+
+        if (error) {
+          if (isMissingVideoColumn(error)) {
+            setMessage(
+              "Uložení se nepovedlo: v Supabase chybí sloupec video_url. Spusťte SQL soubor supabase/add-property-video-url.sql."
+            );
+            return;
+          }
+
+          if (isMissingFloorPlanColumn(error)) {
+            setMessage(
+              "Uložení se nepovedlo: v Supabase chybí sloupec floor_plan. Spusťte SQL soubor supabase/add-property-floor-plan.sql."
+            );
+            return;
+          }
+
+          if (isMissingAreaColumn(error)) {
+            setMessage(
+              "Uložení se nepovedlo: v Supabase chybí sloupce pro plochy. Spusťte SQL soubor supabase/add-property-area-fields.sql."
+            );
+            return;
+          }
+
+          setMessage(`Uložení do Supabase se nepovedlo: ${getAdminErrorMessage(error)}`);
+          return;
+        }
+
+        const withoutCurrent = savedProperties.filter(
+          (item) => item.id !== (editingId ?? property.id)
+        );
+        setSavedProperties([...withoutCurrent, property]);
         setIsSaving(false);
-        return;
-      }
-
-      const { error } = await supabase
-        .from("properties")
-        .upsert(toSupabaseProperty(property), { onConflict: "id" });
-
-      setIsSaving(false);
-
-      if (error) {
-        if (isMissingVideoColumn(error)) {
-          setMessage(
-            "Uložení se nepovedlo: v Supabase chybí sloupec video_url. Spusťte SQL soubor supabase/add-property-video-url.sql."
-          );
-          return;
-        }
-
-        if (isMissingFloorPlanColumn(error)) {
-          setMessage(
-            "Uložení se nepovedlo: v Supabase chybí sloupec floor_plan. Spusťte SQL soubor supabase/add-property-floor-plan.sql."
-          );
-          return;
-        }
-
-        if (isMissingAreaColumn(error)) {
-          setMessage(
-            "Uložení se nepovedlo: v Supabase chybí sloupce pro plochy. Spusťte SQL soubor supabase/add-property-area-fields.sql."
-          );
-          return;
-        }
-
-        setMessage(`Uložení do Supabase se nepovedlo: ${getAdminErrorMessage(error)}`);
+        await refreshAdminProperties({ fallbackToLocal: false });
+        setForm(emptyForm);
+        resetUploadMessages();
+        setEditingId(null);
+        setIsSlugManual(false);
+        setMessage(
+          editingId
+            ? "Nemovitost byla upravena v Supabase."
+            : "Nemovitost byla uložena do Supabase."
+        );
         return;
       }
 
       const withoutCurrent = savedProperties.filter(
         (item) => item.id !== (editingId ?? property.id)
       );
-      setSavedProperties([...withoutCurrent, property]);
-      await refreshAdminProperties({ fallbackToLocal: false });
+      persistLocal([...withoutCurrent, property]);
       setForm(emptyForm);
       resetUploadMessages();
       setEditingId(null);
       setIsSlugManual(false);
-      setMessage(
-        editingId
-          ? "Nemovitost byla upravena v Supabase."
-          : "Nemovitost byla uložena do Supabase."
-      );
-      return;
+      setMessage(editingId ? "Nemovitost byla upravena." : "Nemovitost byla uložena.");
+    } catch (error) {
+      setMessage(`Uložení se nepovedlo: ${getAdminErrorMessage(error)}`);
+    } finally {
+      setIsSaving(false);
     }
-
-    const withoutCurrent = savedProperties.filter(
-      (item) => item.id !== (editingId ?? property.id)
-    );
-    persistLocal([...withoutCurrent, property]);
-    setIsSaving(false);
-    setForm(emptyForm);
-    resetUploadMessages();
-    setEditingId(null);
-    setIsSlugManual(false);
-    setMessage(editingId ? "Nemovitost byla upravena." : "Nemovitost byla uložena.");
   }
 
   function handleEdit(property) {
