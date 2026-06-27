@@ -29,6 +29,7 @@ import { formatPropertyDate, getAreaItems } from "@/lib/property-display";
 import { normalizeVideoInput } from "@/lib/video-utils";
 
 const STORAGE_KEY = "smar-admin-properties";
+const AUTH_TIMEOUT_MS = 15000;
 const SAVE_TIMEOUT_MS = 30000;
 const supabaseConfigIssue = getSupabaseConfigIssue();
 const supabaseEnabled = hasSupabaseConfig();
@@ -753,10 +754,14 @@ export default function AdminPropertyForm() {
     setSavedProperties([]);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: authEmail.trim(),
-        password: authPassword
-      });
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email: authEmail.trim(),
+          password: authPassword
+        }),
+        AUTH_TIMEOUT_MS,
+        "Přihlášení trvá příliš dlouho. Zkontrolujte připojení k Supabase a zkuste to znovu."
+      );
 
       if (error) {
         if (flowId === authFlowIdRef.current) {
@@ -811,16 +816,13 @@ export default function AdminPropertyForm() {
     authFlowIdRef.current = flowId;
     setAuthBusy(true);
     setMessage("Odhlašuji správce...");
-    setSession(null);
-    setAdminAccessWarning("");
-    setSavedProperties([]);
-    setForm(emptyForm);
-    resetUploadMessages();
-    setEditingId(null);
-    setIsSlugManual(false);
 
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await withTimeout(
+        supabase.auth.signOut({ scope: "local" }),
+        AUTH_TIMEOUT_MS,
+        "Odhlášení trvá příliš dlouho. Zkuste obnovit stránku a odhlášení opakovat."
+      );
 
       if (flowId !== authFlowIdRef.current) {
         return;
@@ -831,6 +833,13 @@ export default function AdminPropertyForm() {
         return;
       }
 
+      setSession(null);
+      setAdminAccessWarning("");
+      setSavedProperties([]);
+      setForm(emptyForm);
+      resetUploadMessages();
+      setEditingId(null);
+      setIsSlugManual(false);
       setMessage("Správce je odhlášený.");
     } catch (error) {
       if (flowId === authFlowIdRef.current) {
