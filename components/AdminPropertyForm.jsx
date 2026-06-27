@@ -265,6 +265,23 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function clearSupabaseAuthStorage() {
+  const storages = [window.localStorage, window.sessionStorage].filter(Boolean);
+
+  storages.forEach((storage) => {
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+
+      if (
+        key === "supabase.auth.token" ||
+        (key?.startsWith("sb-") && key.includes("auth-token"))
+      ) {
+        storage.removeItem(key);
+      }
+    }
+  });
+}
+
 function withTimeout(promise, timeoutMs, message) {
   let timeoutId;
   const timeoutPromise = new Promise((_, reject) => {
@@ -816,12 +833,13 @@ export default function AdminPropertyForm() {
     authFlowIdRef.current = flowId;
     setAuthBusy(true);
     setMessage("Odhlašuji správce...");
+    let signOutWarning = "";
 
     try {
       const { error } = await withTimeout(
         supabase.auth.signOut({ scope: "local" }),
         AUTH_TIMEOUT_MS,
-        "Odhlášení trvá příliš dlouho. Zkuste obnovit stránku a odhlášení opakovat."
+        "Odhlášení na Supabase trvá příliš dlouho."
       );
 
       if (flowId !== authFlowIdRef.current) {
@@ -829,24 +847,28 @@ export default function AdminPropertyForm() {
       }
 
       if (error) {
-        setMessage(`Odhlášení se nepovedlo: ${getFriendlyErrorMessage(error)}`);
-        return;
+        signOutWarning = getFriendlyErrorMessage(error);
       }
-
-      setSession(null);
-      setAdminAccessWarning("");
-      setSavedProperties([]);
-      setForm(emptyForm);
-      resetUploadMessages();
-      setEditingId(null);
-      setIsSlugManual(false);
-      setMessage("Správce je odhlášený.");
     } catch (error) {
       if (flowId === authFlowIdRef.current) {
-        setMessage(`Odhlášení se nepovedlo: ${getFriendlyErrorMessage(error)}`);
+        signOutWarning = getFriendlyErrorMessage(error);
       }
     } finally {
       if (flowId === authFlowIdRef.current) {
+        clearSupabaseAuthStorage();
+        setSession(null);
+        setAdminAccessWarning("");
+        setSavedProperties([]);
+        setForm(emptyForm);
+        resetUploadMessages();
+        setEditingId(null);
+        setIsSlugManual(false);
+        setAuthPassword("");
+        setMessage(
+          signOutWarning
+            ? `Správce je odhlášený. Lokální relace byla vyčištěna, ale Supabase neodpovědělo včas: ${signOutWarning}`
+            : "Správce je odhlášený."
+        );
         setAuthBusy(false);
       }
     }
