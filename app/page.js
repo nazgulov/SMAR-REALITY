@@ -13,21 +13,20 @@ import HomePropertyBrowser from "@/components/HomePropertyBrowser";
 import SectionTitle from "@/components/SectionTitle";
 import { getAllProperties, getPropertiesByType } from "@/lib/properties";
 
-const fallbackHeroImage =
+const heroImage =
   "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1800&q=85";
 
 export default async function HomePage() {
   const properties = await getAllProperties();
   const saleProperties = getPropertiesByType(properties, "prodej");
   const rentalProperties = getPropertiesByType(properties, "pronajem");
-  const heroProperty = properties[0];
 
   return (
     <div className="bg-slate-50">
       <section className="relative min-h-[500px] overflow-hidden bg-ink text-white">
         <Image
-          src={heroProperty?.image ?? fallbackHeroImage}
-          alt={heroProperty?.title ?? "Moderní nemovitost v nabídce SMAR Reality"}
+          src={heroImage}
+          alt="Hezký moderní rodinný dům"
           fill
           priority
           className="object-cover opacity-60"
