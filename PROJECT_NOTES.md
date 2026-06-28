@@ -1,6 +1,6 @@
 # SMAR Reality - project notes
 
-Aktualizovano: 2026-06-17
+Aktualizovano: 2026-06-28
 
 Tento soubor slouzi jako rychla pamet projektu pro navazani prace po znovuotevreni repozitare. Neobsahuje hesla, service role klice ani Supabase anon key.
 
@@ -12,7 +12,8 @@ Tento soubor slouzi jako rychla pamet projektu pro navazani prace po znovuotevre
 - Hlavni vetev: `main`
 - Lokalni URL pri vyvoji: http://localhost:3000
 - Aktivni hosting pro dynamicky web: Vercel
-- GitHub Pages deploy byl z projektu odstranen. Produkcni provoz bezi pres Vercel.
+- GitHub Pages deploy workflow byl z projektu odstranen. Produkcni provoz bezi pres Vercel.
+- Pokud GitHub stale posila maily z workflow `pages build and deployment`, nejde o YAML v repu, ale o vestavene GitHub Pages nastaveni v repo Settings -> Pages. Tam je potreba Pages vypnout nebo zmenit source mimo branch/docs.
 
 ## Technologie
 
@@ -73,6 +74,7 @@ Dulezite sloupce:
 - `description`
 - `image`
 - `gallery` - pole URL obrazku
+- `floor_plan` - URL obrazku pudorysu, prazdny string pokud neni vlozeny
 - `matterport_url`
 - `video_url`
 - `map_url`
@@ -85,6 +87,7 @@ Storage bucket:
 
 - `property-images`
 - Pouziva se pro obrazky a nahrana videa z administrace.
+- Pouziva se take pro pudorysy.
 
 SQL soubory:
 
@@ -94,6 +97,7 @@ SQL soubory:
 - `supabase/add-property-area-fields.sql` - migrace ploch.
 - `supabase/add-property-map-url.sql` - migrace mapy.
 - `supabase/add-property-video-url.sql` - migrace videa.
+- `supabase/add-property-floor-plan.sql` - migrace pudorysu.
 - `supabase/insert-hermanice-property.sql` - jednorazovy insert/update pro konkretni inzerat.
 
 ## RLS a admin pristup
@@ -126,11 +130,13 @@ URL: `/admin/nemovitosti`
 Aktualni chovani:
 
 - Pri prihlaseni se znovu nactou ulozene nemovitosti ze Supabase.
-- Pri odhlaseni se stav administrace vycisti.
+- Pri odhlaseni se stav administrace vycisti. Pokud Supabase signOut neodpovi vcas, aplikace vycisti lokalni Supabase session v prohlizeci a admin UI se i tak prepne do odhlaseneho stavu.
+- Login/logout maji timeout, aby UI nezustalo zaseknute na `Prihlasuji...` nebo `Odhlasuji...`.
 - Pri spatnych prihlasovacich udajich se zobrazi hlaska.
 - Ulozene polozky v pravem panelu lze editovat a mazat.
 - Export JSON blok byl odstraneny.
 - Informacni bloky "Prototyp bez prihlaseni" a "Pripraveno pro databazi" byly odstranene.
+- Ukladani do Supabase ma timeout a `finally`, aby tlacitko nezustalo ve stavu `Ukladam...`.
 
 Formular umi:
 
@@ -140,14 +146,26 @@ Formular umi:
 - zadavat plochu pozemku, uzitnou a zastavenou plochu,
 - vybirat hlavni vlastnosti z prednastaveneho seznamu a dopsat vlastni,
 - nahrat hlavni obrazek, galerii a video z PC,
+- nahrat pudorys v PNG z PC,
 - vlozit video URL,
 - vlozit Matterport URL,
 - vlozit mapu/adresu pres Mapy.com.
+- Uploady v administraci pouzivaji viditelny file input pres plochu tlacitka a zobrazuji stav primo u pole: nahravam, uspech nebo konkretni chyba ze Supabase.
+
+## Verejny web a detail nemovitosti
+
+- Homepage hero pouziva pevnou univerzalni fotku domu z Unsplash. Uz se nemeni podle posledni vlozene nemovitosti.
+- Detail nemovitosti zobrazuje sekci `Pudorys`, pouze pokud je u nemovitosti vyplneny `floorPlan`.
+- Fotogalerie v detailu je interaktivni lightbox:
+  - klik na nahled otevira zvetsenou fotku,
+  - sipky v overlay listuji fotkami,
+  - klavesy vlevo/vpravo listuji taky,
+  - Escape a krizkem lze galerii zavrit.
 
 ## Routy
 
 - `/` - homepage s hero sekci, testovacim upozornenim a filtrem nemovitosti.
-- `/nemovitosti/[id]` - detail nemovitosti.
+- `/nemovitosti/[id]` - detail nemovitosti s fotogalerii, mapou, videem, Matterportem a volitelnym pudorysem.
 - `/admin/nemovitosti` - administrace nabidek.
 - `/kontakt` - kontaktni stranka.
 - `/pro-maklere` - stranka pro maklere.
@@ -169,6 +187,7 @@ Soubor: `data/contact.js`
 - `components/AdminPropertyForm.jsx` - hlavni logika administrace.
 - `components/HomePropertyBrowser.jsx` - filtrovani nabidek na homepage.
 - `components/PropertyDetail.jsx` - detail nemovitosti.
+- `components/PropertyGallery.jsx` - interaktivni lightbox fotogalerie v detailu.
 - `components/MapEmbed.jsx` - mapa.
 - `components/VideoEmbed.jsx` - video.
 - `components/MatterportEmbed.jsx` - Matterport iframe.
@@ -195,11 +214,16 @@ Pozor:
 - `.env.local` nikdy necommitovat.
 - Hesla a Supabase service role key nikdy nepsat do repozitare.
 - `supabase/harden-rls.sql` je aktualne lokalni/untracked soubor, kontrolovat pred commitem.
+- Aktualni dohoda v teto relaci: po hotove zmene automaticky commitovat a pushovat, ale nikdy nepridavat `supabase/harden-rls.sql`, dokud si to uzivatel vyslovne nevyzada.
 
 ## Posledni dulezite zmeny
 
-- Stabilizovane prihlasovani/odhlasovani v administraci.
-- Po prihlaseni se znovu nacitaji nemovitosti ze Supabase.
-- Odstranen JSON export v administraci.
-- Odstraneny stare info boxy v hlavicce administrace.
+- `c156fa1` - odhlaseni admina ma lokalni fallback; pri timeoutu Supabase se lokalni session vycisti a UI se odhlasi.
+- `32a341d` - stabilizace auth stavu v adminu; session se pri odhlasovani necisti predcasne.
+- `fadea0e` - save flow v adminu ma timeout a `finally`, aby se tlacitko nezaseklo na `Ukladam...`.
+- `12a95b7` - opravene media upload controls v adminu pro hlavni obrazek, galerii, pudorys a video.
+- `5b846cb` - homepage hero pouziva pevnou univerzalni fotku domu.
+- `107ae1b` - odstranen GitHub Pages deploy workflow a Pages-only Next konfigurace.
+- `331087b` - pridana interaktivni fotogalerie v detailu nemovitosti.
+- `4a7ed88` - pridana podpora pudorysu v adminu, detailu a Supabase schematu.
 - Web stale zobrazuje upozorneni, ze jde o testovaci verzi na docasne domene.
